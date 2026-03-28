@@ -1,3 +1,6 @@
+# AI GENERATED README. UPDATE DOCKER AND K8 RELATED DETAILS LATER - Amzal
+
+
 # notification-service
 
 Dispatches email, SMS, and push notifications to patients and doctors within the DistributedHealth platform.

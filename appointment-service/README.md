@@ -1,3 +1,6 @@
+# AI GENERATED README. UPDATE DOCKER AND K8 RELATED DETAILS LATER - Amzal
+
+
 # appointment-service
 
 Handles booking, rescheduling, and cancellation of appointments between patients and doctors.

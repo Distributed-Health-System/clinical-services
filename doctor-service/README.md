@@ -1,3 +1,6 @@
+# AI GENERATED README. UPDATE DOCKER AND K8 RELATED DETAILS LATER - Amzal
+
+
 # doctor-service
 
 Manages doctor profiles, specializations, and availability within the DistributedHealth platform.

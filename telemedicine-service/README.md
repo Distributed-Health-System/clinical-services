@@ -1,3 +1,5 @@
+# AI GENERATED README. UPDATE DOCKER AND K8 RELATED DETAILS LATER - Amzal
+
 # telemedicine-service
 
 Manages virtual consultation sessions, room provisioning, and session lifecycle within the DistributedHealth platform.

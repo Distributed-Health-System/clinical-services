@@ -1,3 +1,6 @@
+# AI GENERATED README. UPDATE DOCKER AND K8 RELATED DETAILS LATER - Amzal
+
+
 # patient-service
 
 Manages patient registration, profiles, and demographics within the DistributedHealth platform.
