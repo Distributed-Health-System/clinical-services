@@ -1,19 +1,24 @@
-# Stage 1: Builder
-FROM node:20-alpine AS builder
+# Stage 1: Dependencies
+# Cached separately so dependency resolution is reused across source-only changes.
+FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
-COPY . .
-RUN npm run build
 
-# Stage 2: Production
-# The image produced here is orchestration-agnostic.
-# Use it with Docker Compose (environment: PORT=3007) or inject PORT via a
-# K8s ConfigMap / env: block in the pod spec — no image changes required.
+# Stage 2: Build
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build && npm prune --omit=dev
+
+# Stage 3: Production
+# Orchestration-agnostic image: runtime config comes from env (Docker/K8s).
 FROM node:20-alpine AS production
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app/dist ./dist
-EXPOSE 3007
+ENV NODE_ENV=production
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node --from=builder /app/dist ./dist
+EXPOSE 3002
+USER node
 CMD ["node", "dist/main.js"]

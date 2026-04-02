@@ -1,4 +1,4 @@
-/**
- * Placeholder interface for Notification repository.
- */
-export interface INotificationRepository {}
+// /**
+//  * Placeholder interface for Notification repository.
+//  */
+// export interface INotificationRepository {}

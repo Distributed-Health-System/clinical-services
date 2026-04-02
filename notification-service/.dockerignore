@@ -28,8 +28,6 @@ npm-debug.log*
 Thumbs.db
 
 # Dev-only config
-tsconfig.json
-tsconfig.build.json
 .prettierrc
 eslint.config.mjs
 nest-cli.json
