@@ -7,7 +7,7 @@ import { NotificationModule } from './notification/notification.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
-    MongooseModule.forRoot(process.env.MONGODB_URI ?? ''),
+    // MongooseModule.forRoot(process.env.MONGODB_URI ?? ''),
     NotificationModule,
   ],
 })
