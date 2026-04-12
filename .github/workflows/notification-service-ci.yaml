@@ -2,6 +2,7 @@
 name: Build and Push Docker Image (Notification Service)
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -52,3 +53,28 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest,${{ secrets.DOCKERHUB_USERNAME }}/notification-service:${{ env.SHORT_SHA }}
         env:
           DOCKER_BUILDKIT: 1
+
+      - name: Checkout Infrastructure Repo
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+        with:
+          repository: Distributed-Health-System/infrastructure
+          token: ${{ secrets.INFRA_REPO_PAT }}
+          path: infrastructure
+          
+      - name: Update Kustomize Image Tag
+        if: github.event_name == 'push'
+        run: |
+          cd infrastructure/k8s/notification-service
+          kustomize edit set image amzalfoumi/notification-service=amzalfoumi/notification-service:${{ env.SHORT_SHA }}
+
+      - name: Commit and Push back to GitOps Repo
+        if: github.event_name == 'push'
+        run: |
+          cd infrastructure
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add k8s/notification-service/kustomization.yaml
+          git commit -m "Deploy notification-service to version ${{ env.SHORT_SHA }}"
+          git pull --rebase origin main
+          git push origin main
