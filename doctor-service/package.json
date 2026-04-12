@@ -14,6 +14,7 @@
     "start:prod": "node dist/main",
     "docker:build": "docker build -t doctor-service:latest .",
     "docker:run": "docker run -d --rm -p 3003:3003 --env-file .env doctor-service:latest",
+    "docker:push":"bash ./scripts/docker-build-push.sh",
     "k8s:deploy:bash": "bash ./scripts/k8s-deploy.sh",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
