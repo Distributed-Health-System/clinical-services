@@ -1,13 +1,39 @@
-import { Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
-import { Doctor as DoctorEntity } from '../../../../domain/entities/doctor.entity';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument } from 'mongoose';
 
-export type DoctorDocument = DoctorEntity & Document;
+export type DoctorDocument = HydratedDocument<DoctorSchemaClass>;
 
-/**
- * Placeholder Mongoose schema for Doctor.
- */
-@Schema({ timestamps: true })
-export class Doctor {}
+@Schema({ collection: 'doctors_amzal', timestamps: true })
+export class DoctorSchemaClass {
+  @Prop({ required: true })
+  firstName: string;
 
-export const DoctorSchema = SchemaFactory.createForClass(Doctor);
+  @Prop({ required: true })
+  lastName: string;
+
+  @Prop({ required: true, unique: true })
+  email: string;
+
+  @Prop({ default: '' })
+  phone: string;
+
+  @Prop({ required: true })
+  specialization: string;
+
+  @Prop({ required: true, unique: true })
+  licenseNumber: string;
+
+  @Prop({ default: 0 })
+  yearsOfExperience: number;
+
+  @Prop({ default: '' })
+  bio: string;
+
+  @Prop({ default: true })
+  isAvailable: boolean;
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const DoctorSchema = SchemaFactory.createForClass(DoctorSchemaClass);
