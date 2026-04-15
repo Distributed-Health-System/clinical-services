@@ -1,11 +1,10 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-
 /**
- * Placeholder Clerk auth guard.
+ * @deprecated
+ *
+ * This file has been superseded by auth.guard.ts / AuthGuard.
+ * It is kept to avoid breaking git history references and any stale imports.
+ *
+ * Redirects all exports to the canonical location.
  */
-@Injectable()
-export class ClerkAuthGuard implements CanActivate {
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    throw new UnauthorizedException('ClerkAuthGuard not yet implemented.');
-  }
-}
+export { AuthGuard as ClerkAuthGuard } from './auth.guard';
+export { AuthGuard } from './auth.guard';
