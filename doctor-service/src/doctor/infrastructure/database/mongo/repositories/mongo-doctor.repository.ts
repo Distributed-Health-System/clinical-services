@@ -15,6 +15,7 @@ export class MongoDoctorRepository implements IDoctorRepository {
   private toEntity(doc: DoctorDocument): DoctorEntity {
     const entity = new DoctorEntity();
     entity.id = (doc._id as object).toString();
+    entity.userId = doc.userId;
     entity.firstName = doc.firstName;
     entity.lastName = doc.lastName;
     entity.email = doc.email;
@@ -24,18 +25,25 @@ export class MongoDoctorRepository implements IDoctorRepository {
     entity.yearsOfExperience = doc.yearsOfExperience;
     entity.bio = doc.bio;
     entity.isAvailable = doc.isAvailable;
+    entity.isApproved = doc.isApproved;
     entity.createdAt = doc.createdAt;
     entity.updatedAt = doc.updatedAt;
     return entity;
   }
 
-  async findAll(): Promise<DoctorEntity[]> {
-    const docs = await this.doctorModel.find().exec();
+  async findAll(onlyApproved = false): Promise<DoctorEntity[]> {
+    const filter = onlyApproved ? { isApproved: true } : {};
+    const docs = await this.doctorModel.find(filter).exec();
     return docs.map((d) => this.toEntity(d));
   }
 
   async findById(id: string): Promise<DoctorEntity | null> {
     const doc = await this.doctorModel.findById(id).exec();
+    return doc ? this.toEntity(doc) : null;
+  }
+
+  async findByUserId(userId: string): Promise<DoctorEntity | null> {
+    const doc = await this.doctorModel.findOne({ userId }).exec();
     return doc ? this.toEntity(doc) : null;
   }
 

@@ -1,4 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { IDoctorRepository } from '../../domain/repositories/doctor.repository.interface';
 import { DOCTOR_REPOSITORY } from '../../domain/repositories/doctor.repository.interface';
 import { DoctorEntity } from '../../domain/entities/doctor.entity';
@@ -14,23 +19,67 @@ export class DoctorService {
   ) {}
 
   findAll(): Promise<DoctorEntity[]> {
-    return this.doctorRepository.findAll();
+    return this.doctorRepository.findAll(true);
   }
 
-  async findById(id: string): Promise<DoctorEntity> {
+  async findById(
+    id: string,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<DoctorEntity> {
     const doctor = await this.doctorRepository.findById(id);
     if (!doctor) throw new DoctorNotFoundException(id);
+
+    // Unapproved profiles are only visible to the doctor themselves or admin
+    if (
+      !doctor.isApproved &&
+      requestingUserRole !== 'admin' &&
+      doctor.userId !== requestingUserId
+    ) {
+      throw new NotFoundException(`Doctor with id ${id} not found`);
+    }
+
     return doctor;
   }
 
-  create(dto: CreateDoctorDto): Promise<DoctorEntity> {
-    return this.doctorRepository.create(dto);
+  async create(dto: CreateDoctorDto, userId: string): Promise<DoctorEntity> {
+    return this.doctorRepository.create({ ...dto, userId, isApproved: false });
   }
 
-  async update(id: string, dto: UpdateDoctorDto): Promise<DoctorEntity> {
+  async update(
+    id: string,
+    dto: UpdateDoctorDto,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<DoctorEntity> {
+    const doctor = await this.doctorRepository.findById(id);
+    if (!doctor) throw new DoctorNotFoundException(id);
+
+    if (requestingUserRole !== 'admin' && doctor.userId !== requestingUserId) {
+      throw new ForbiddenException('You can only update your own profile');
+    }
+
     const updated = await this.doctorRepository.update(id, dto);
     if (!updated) throw new DoctorNotFoundException(id);
     return updated;
+  }
+
+  async approve(id: string): Promise<DoctorEntity> {
+    const doctor = await this.doctorRepository.findById(id);
+    if (!doctor) throw new DoctorNotFoundException(id);
+
+    const updated = await this.doctorRepository.update(id, {
+      isApproved: true,
+    });
+    if (!updated) throw new DoctorNotFoundException(id);
+    return updated;
+  }
+
+  async reject(id: string): Promise<void> {
+    const doctor = await this.doctorRepository.findById(id);
+    if (!doctor) throw new DoctorNotFoundException(id);
+
+    await this.doctorRepository.delete(id);
   }
 
   async delete(id: string): Promise<void> {
