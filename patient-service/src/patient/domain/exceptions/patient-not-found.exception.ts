@@ -1,9 +1,7 @@
-/**
- * Exception for when a Patient is not found.
- */
-export class PatientNotFoundException extends Error {
+import { NotFoundException } from '@nestjs/common';
+
+export class PatientNotFoundException extends NotFoundException {
   constructor(id: string) {
     super(`Patient with id "${id}" was not found.`);
-    this.name = 'PatientNotFoundException';
   }
 }
