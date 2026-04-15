@@ -18,8 +18,10 @@ export class DoctorService {
     private readonly doctorRepository: IDoctorRepository,
   ) {}
 
-  findAll(): Promise<DoctorEntity[]> {
-    return this.doctorRepository.findAll(true);
+  findAll(specialization?: string): Promise<DoctorEntity[]> {
+    return this.doctorRepository.findAll(true, {
+      specialization: specialization?.trim() || undefined,
+    });
   }
 
   async findById(
@@ -85,5 +87,37 @@ export class DoctorService {
   async delete(id: string): Promise<void> {
     const deleted = await this.doctorRepository.delete(id);
     if (!deleted) throw new DoctorNotFoundException(id);
+  }
+
+  /** Profile for the authenticated doctor user (Keycloak / gateway user id). */
+  async requireDoctorByUserId(userId: string): Promise<DoctorEntity> {
+    const doctor = await this.doctorRepository.findByUserId(userId);
+    if (!doctor) {
+      throw new NotFoundException(
+        'Doctor profile not found. Create your profile before using this feature.',
+      );
+    }
+    return doctor;
+  }
+
+  /** Same as requireDoctorByUserId but enforces admin approval. */
+  async requireApprovedDoctorByUserId(userId: string): Promise<DoctorEntity> {
+    const doctor = await this.requireDoctorByUserId(userId);
+    if (!doctor.isApproved) {
+      throw new ForbiddenException(
+        'Doctor profile is not approved yet. You cannot perform this action.',
+      );
+    }
+    return doctor;
+  }
+
+  /** Resolve either Mongo `_id` or gateway `userId` to a doctor entity. */
+  async resolveDoctorRef(doctorRef: string): Promise<DoctorEntity> {
+    let doctor = await this.doctorRepository.findById(doctorRef);
+    if (!doctor) {
+      doctor = await this.doctorRepository.findByUserId(doctorRef);
+    }
+    if (!doctor) throw new DoctorNotFoundException(doctorRef);
+    return doctor;
   }
 }

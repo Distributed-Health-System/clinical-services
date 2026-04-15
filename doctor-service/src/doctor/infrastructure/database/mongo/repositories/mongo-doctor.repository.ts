@@ -5,6 +5,10 @@ import { DoctorSchemaClass, DoctorDocument } from '../schemas/doctor.schema';
 import { IDoctorRepository } from '../../../../domain/repositories/doctor.repository.interface';
 import { DoctorEntity } from '../../../../domain/entities/doctor.entity';
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 @Injectable()
 export class MongoDoctorRepository implements IDoctorRepository {
   constructor(
@@ -31,8 +35,21 @@ export class MongoDoctorRepository implements IDoctorRepository {
     return entity;
   }
 
-  async findAll(onlyApproved = false): Promise<DoctorEntity[]> {
-    const filter = onlyApproved ? { isApproved: true } : {};
+  async findAll(
+    onlyApproved = false,
+    options?: { specialization?: string },
+  ): Promise<DoctorEntity[]> {
+    const filter: Record<string, unknown> = {};
+    if (onlyApproved) {
+      filter.isApproved = true;
+    }
+    const spec = options?.specialization?.trim();
+    if (spec) {
+      filter.specialization = {
+        $regex: escapeRegex(spec),
+        $options: 'i',
+      };
+    }
     const docs = await this.doctorModel.find(filter).exec();
     return docs.map((d) => this.toEntity(d));
   }
