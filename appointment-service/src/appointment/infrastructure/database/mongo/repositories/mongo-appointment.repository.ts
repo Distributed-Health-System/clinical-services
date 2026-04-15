@@ -5,17 +5,15 @@ import {
   Appointment,
   AppointmentDocument,
 } from '../schemas/appointment.schema';
-import { Appointment as AppointmentEntity } from '../../../../../domain/entities/appointment.entity';
-import {
-  IAppointmentRepository,
-  APPOINTMENT_REPOSITORY,
-} from '../../../../../domain/repositories/appointment.repository.interface';
-import { AppointmentStatus } from '../../../../../domain/enums/appointment-status.enum';
-import { AppointmentTimeFilter } from '../../../../../domain/enums/appointment-time-filter.enum';
+import { Appointment as AppointmentEntity } from '../../../../domain/entities/appointment.entity';
+import { APPOINTMENT_REPOSITORY } from '../../../../domain/repositories/appointment.repository.interface';
+import type { IAppointmentRepository } from '../../../../domain/repositories/appointment.repository.interface';
+import { AppointmentStatus } from '../../../../domain/enums/appointment-status.enum';
+import { AppointmentTimeFilter } from '../../../../domain/enums/appointment-time-filter.enum';
 import {
   SLOT_DURATION_MINUTES,
   SLOT_BLOCKING_STATUSES,
-} from '../../../../../domain/constants/appointment.constants';
+} from '../../../../domain/constants/appointment.constants';
 
 // Re-export the token so appointment.module.ts can import from one place
 export { APPOINTMENT_REPOSITORY };
