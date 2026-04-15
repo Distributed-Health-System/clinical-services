@@ -7,12 +7,12 @@ on:
     branches:
       - main
     paths:
-      - 'notification-service/**'
+      - "notification-service/**"
   pull_request:
     branches:
       - main
     paths:
-      - 'notification-service/**'
+      - "notification-service/**"
 
 jobs:
   build:
@@ -61,7 +61,7 @@ jobs:
           repository: Distributed-Health-System/infrastructure
           token: ${{ secrets.INFRA_REPO_PAT }}
           path: infrastructure
-          
+
       - name: Update Kustomize Image Tag
         if: github.event_name == 'push'
         run: |
