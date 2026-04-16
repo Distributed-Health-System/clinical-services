@@ -23,6 +23,11 @@ export class UpdateAppointmentStatusUseCase {
     userId: string,
     role: UserRole,
   ): Promise<Appointment> {
+    throw new BadRequestException(
+      'Manual status updates are disabled. Appointments are automatically confirmed upon payment.'
+    );
+
+    /* 
     if (role !== UserRole.DOCTOR) {
       throw new ForbiddenException('Only doctors can accept or reject appointments.');
     }
@@ -54,16 +59,19 @@ export class UpdateAppointmentStatusUseCase {
 
     let telemedicineLink: string | undefined;
     if (dto.status === AppointmentStatus.CONFIRMED) {
-      telemedicineLink = await this.telemedicineClient.generateLink(appointment.id);
+      const links = await this.telemedicineClient.generateLink(appointment.id);
+      telemedicineLinkDoctor = links.doctorLink;
+      telemedicineLinkPatient = links.patientLink;
       this.logger.log(
-        `Telemedicine link generated for appointment ${id}: ${telemedicineLink}`,
+        `Telemedicine links generated for appointment ${id}`,
       );
     }
 
     const updated = await this.appointmentRepository.updateStatus(
       id,
       dto.status,
-      telemedicineLink,
+      telemedicineLinkDoctor,
+      telemedicineLinkPatient,
     );
     if (!updated) {
       throw new NotFoundException(`Appointment ${id} could not be updated.`);
@@ -73,5 +81,6 @@ export class UpdateAppointmentStatusUseCase {
       `Appointment ${id} status → ${dto.status} by doctor ${userId}.`,
     );
     return updated;
+    */
   }
 }

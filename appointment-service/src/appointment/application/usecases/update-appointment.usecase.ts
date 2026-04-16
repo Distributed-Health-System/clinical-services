@@ -6,6 +6,7 @@ import { AppointmentStatus } from '../../domain/enums/appointment-status.enum';
 import { UserRole } from '../../domain/enums/user-role.enum';
 import { SLOT_DURATION_MINUTES } from '../../domain/constants/appointment.constants';
 import { DoctorClient } from '../../infrastructure/external/doctor.client';
+import { AppointmentValidationService } from '../services/appointment-validation.service';
 import { UpdateAppointmentDto } from '../dtos/update-appointment.dto';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class UpdateAppointmentUseCase {
     @Inject(APPOINTMENT_REPOSITORY)
     private readonly appointmentRepository: IAppointmentRepository,
     private readonly doctorClient: DoctorClient,
+    private readonly validationService: AppointmentValidationService,
   ) {}
 
   async execute(
@@ -58,42 +60,20 @@ export class UpdateAppointmentUseCase {
 
     if (dto.slotStart) {
       const newSlotStart = new Date(dto.slotStart);
-      this._validateSlotDate(newSlotStart);
 
-      const slotValidation = await this.doctorClient.validateSlot(
+      // 1. Reusable Validation (Boundary + Availability + Conflict)
+      await this.validationService.validateBooking(
         appointment.doctorId,
+        userId,
         newSlotStart,
       );
-      if (!slotValidation.valid) {
-        throw new BadRequestException(
-          `The new time slot is not available: ${
-            slotValidation.reason ?? 'outside doctor availability.'
-          }`,
-        );
-      }
-
-      const [doctorConflict, patientConflict] = await Promise.all([
-        this.appointmentRepository.hasSlotConflictForDoctor(
-          appointment.doctorId,
-          newSlotStart,
-        ),
-        this.appointmentRepository.hasSlotConflictForPatient(userId, newSlotStart),
-      ]);
-
-      if (doctorConflict) {
-        throw new ConflictException(
-          `Doctor ${appointment.doctorId} already has a booking in the new time slot.`,
-        );
-      }
-      if (patientConflict) {
-        throw new ConflictException(
-          'You already have an appointment in the new time slot.',
-        );
-      }
 
       partial.slotStart = newSlotStart;
       partial.status = AppointmentStatus.PENDING;
-      partial.telemedicineLink = undefined;
+      // Rescheduling requires re-confirmation (payment/auto) or manual,
+      // so we clear existing links.
+      partial.telemedicineLinkDoctor = undefined;
+      partial.telemedicineLinkPatient = undefined;
     }
 
     if (Object.keys(partial).length === 0) {
@@ -111,22 +91,5 @@ export class UpdateAppointmentUseCase {
       `Appointment ${id} updated by patient ${userId}. Changes: ${JSON.stringify(partial)}`,
     );
     return updated;
-  }
-
-  private _validateSlotDate(slotStart: Date): void {
-    if (isNaN(slotStart.getTime())) {
-      throw new BadRequestException('Invalid date provided for slotStart.');
-    }
-    if (slotStart <= new Date()) {
-      throw new BadRequestException('Appointment slot must be in the future.');
-    }
-    const validMinutes = [0, 60 - SLOT_DURATION_MINUTES];
-    const minutes = slotStart.getUTCMinutes();
-    if (!validMinutes.includes(minutes)) {
-      throw new BadRequestException(
-        `Slot start must align to a ${SLOT_DURATION_MINUTES}-minute boundary (:00 or :30 UTC). ` +
-          `Received :${String(minutes).padStart(2, '0')} UTC.`,
-      );
-    }
   }
 }

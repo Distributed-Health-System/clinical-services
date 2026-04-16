@@ -209,6 +209,7 @@ export class AppointmentController {
   // IMPORTANT: Declared BEFORE /:id to ensure specific route matches first.
   // -------------------------------------------------------------------------
 
+  /*
   @Patch(':id/status')
   @ApiOperation({
     summary: 'Accept or reject a PENDING appointment (Doctor only)',
@@ -234,6 +235,7 @@ export class AppointmentController {
     }
     return this.updateAppointmentStatusUseCase.execute(id, dto, userId, role as UserRole);
   }
+  */
 
   // -------------------------------------------------------------------------
   // PATCH /appointments/:id — Modify or Cancel (Patient only)

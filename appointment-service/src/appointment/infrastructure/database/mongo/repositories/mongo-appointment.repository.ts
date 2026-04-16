@@ -74,12 +74,16 @@ export class MongoAppointmentRepository implements IAppointmentRepository {
   async updateStatus(
     id: string,
     status: AppointmentStatus,
-    telemedicineLink?: string,
+    telemedicineLinkDoctor?: string,
+    telemedicineLinkPatient?: string,
   ): Promise<AppointmentEntity | null> {
-    // Build the update payload — only include telemedicineLink if it was provided
+    // Build the update payload — only include links if they were provided
     const updatePayload: Partial<AppointmentEntity> = { status };
-    if (telemedicineLink) {
-      updatePayload.telemedicineLink = telemedicineLink;
+    if (telemedicineLinkDoctor) {
+      updatePayload.telemedicineLinkDoctor = telemedicineLinkDoctor;
+    }
+    if (telemedicineLinkPatient) {
+      updatePayload.telemedicineLinkPatient = telemedicineLinkPatient;
     }
 
     const doc = await this.appointmentModel
@@ -251,7 +255,8 @@ export class MongoAppointmentRepository implements IAppointmentRepository {
     entity.slotStart = doc.slotStart;
     entity.status = doc.status;
     entity.reasonForVisit = doc.reasonForVisit;
-    entity.telemedicineLink = doc.telemedicineLink ?? undefined;
+    entity.telemedicineLinkDoctor = doc.telemedicineLinkDoctor ?? undefined;
+    entity.telemedicineLinkPatient = doc.telemedicineLinkPatient ?? undefined;
     entity.paymentStatus = doc.paymentStatus;
     return entity;
   }

@@ -7,6 +7,8 @@ import { UserRole } from '../../domain/enums/user-role.enum';
 import { SLOT_DURATION_MINUTES } from '../../domain/constants/appointment.constants';
 import { PaymentClient } from '../../infrastructure/external/payment.client';
 import { DoctorClient } from '../../infrastructure/external/doctor.client';
+import { TelemedicineClient } from '../../infrastructure/external/telemedicine.client';
+import { AppointmentValidationService } from '../services/appointment-validation.service';
 import { CreateAppointmentDto } from '../dtos/create-appointment.dto';
 
 @Injectable()
@@ -18,6 +20,8 @@ export class BookAppointmentUseCase {
     private readonly appointmentRepository: IAppointmentRepository,
     private readonly paymentClient: PaymentClient,
     private readonly doctorClient: DoctorClient,
+    private readonly telemedicineClient: TelemedicineClient,
+    private readonly validationService: AppointmentValidationService,
   ) {}
 
   async execute(
@@ -30,78 +34,56 @@ export class BookAppointmentUseCase {
     }
 
     const slotStart = new Date(dto.slotStart);
-    this._validateSlotDate(slotStart);
 
-    const slotValidation = await this.doctorClient.validateSlot(
-      dto.doctorId,
-      slotStart,
-    );
-    if (!slotValidation.valid) {
-      throw new BadRequestException(
-        `This time slot is not available: ${
-          slotValidation.reason ?? 'outside doctor availability.'
-        }`,
-      );
-    }
+    // 1. Reusable Validation (Boundary + Availability + Conflict)
+    await this.validationService.validateBooking(dto.doctorId, patientId, slotStart);
 
-    const [doctorConflict, patientConflict] = await Promise.all([
-      this.appointmentRepository.hasSlotConflictForDoctor(dto.doctorId, slotStart),
-      this.appointmentRepository.hasSlotConflictForPatient(patientId, slotStart),
-    ]);
-
-    if (doctorConflict) {
-      throw new ConflictException(
-        `Doctor ${dto.doctorId} already has a booking in this time slot. Please choose a different slot.`,
-      );
-    }
-    if (patientConflict) {
-      throw new ConflictException(
-        'You already have an appointment in this time slot. Please choose a different slot.',
-      );
-    }
-
+    // 2. Initial Creation (Always starts as PENDING)
     const newAppointment = await this.appointmentRepository.create({
       patientId,
       doctorId: dto.doctorId,
       slotStart,
       status: AppointmentStatus.PENDING,
       reasonForVisit: dto.reasonForVisit,
-      telemedicineLink: undefined,
+      telemedicineLinkDoctor: undefined,
+      telemedicineLinkPatient: undefined,
       paymentStatus: 'PENDING',
     });
 
+    // 3. Payment Gating for Automated Confirmation
     try {
       const paymentStatus = await this.paymentClient.confirmPayment(newAppointment.id);
-      if (paymentStatus !== 'PENDING') {
+      
+      if (paymentStatus === 'CONFIRMED') {
+        // AUTOMATED CONFIRMATION FLOW
+        // If payment is successful, we skip manual doctor approval.
+        const links = await this.telemedicineClient.generateLink(newAppointment.id);
+        
+        const updated = await this.appointmentRepository.updateStatus(
+          newAppointment.id,
+          AppointmentStatus.CONFIRMED,
+          links.doctorLink,
+          links.patientLink,
+        );
+
+        if (updated) {
+          this.logger.log(`Appointment ${newAppointment.id} AUTO-CONFIRMED via payment.`);
+          return updated;
+        }
+      } else if (paymentStatus !== 'PENDING') {
+        // If payment failed or has another status, update the record
         await this.appointmentRepository.update(newAppointment.id, { paymentStatus });
         newAppointment.paymentStatus = paymentStatus;
       }
-    } catch {
+    } catch (error) {
       this.logger.warn(
-        `Payment confirmation silently failed for appointment ${newAppointment.id}. Status remains PENDING.`,
+        `Automated confirmation failed for appointment ${newAppointment.id}: ${error.message}`,
       );
     }
 
     this.logger.log(
-      `Appointment ${newAppointment.id} booked — patient: ${patientId}, doctor: ${dto.doctorId}, slot: ${slotStart.toISOString()}`,
+      `Appointment ${newAppointment.id} booked (PENDING) — patient: ${patientId}, doctor: ${dto.doctorId}`,
     );
     return newAppointment;
-  }
-
-  private _validateSlotDate(slotStart: Date): void {
-    if (isNaN(slotStart.getTime())) {
-      throw new BadRequestException('Invalid date provided for slotStart.');
-    }
-    if (slotStart <= new Date()) {
-      throw new BadRequestException('Appointment slot must be in the future.');
-    }
-    const validMinutes = [0, 60 - SLOT_DURATION_MINUTES];
-    const minutes = slotStart.getUTCMinutes();
-    if (!validMinutes.includes(minutes)) {
-      throw new BadRequestException(
-        `Slot start must align to a ${SLOT_DURATION_MINUTES}-minute boundary (:00 or :30 UTC). ` +
-          `Received :${String(minutes).padStart(2, '0')} UTC.`,
-      );
-    }
   }
 }
