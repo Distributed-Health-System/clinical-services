@@ -25,5 +25,6 @@ import { DOCTOR_REPOSITORY } from './domain/repositories/doctor.repository.inter
       useClass: MongoDoctorRepository,
     },
   ],
+  exports: [DoctorService],
 })
 export class DoctorModule {}

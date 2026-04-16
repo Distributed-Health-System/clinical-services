@@ -8,10 +8,11 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { DoctorService } from '../../application/services/doctor.service';
 import { CreateDoctorDto } from '../../application/dtos/create-doctor.dto';
 import { UpdateDoctorDto } from '../../application/dtos/update-doctor.dto';
@@ -26,8 +27,8 @@ export class DoctorController {
 
   // Any authenticated user — patients browse approved doctors
   @Get()
-  findAll() {
-    return this.doctorService.findAll();
+  findAll(@Query('specialization') specialization?: string) {
+    return this.doctorService.findAll(specialization);
   }
 
   // Any authenticated user — unapproved profiles hidden unless own or admin
