@@ -1,6 +1,5 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsDate,
@@ -13,52 +12,7 @@ import {
   IsUrl,
   Matches,
   MaxDate,
-  ValidateNested,
 } from 'class-validator';
-
-export class PrescriptionRefDto {
-  @IsString()
-  @IsNotEmpty()
-  id: string;
-
-  @IsString()
-  @IsNotEmpty()
-  title: string;
-
-  @IsString()
-  @IsNotEmpty()
-  blobKey: string;
-
-  @IsUrl()
-  fileUrl: string;
-
-  @IsString()
-  @IsNotEmpty()
-  mimeType: string;
-
-  @IsString()
-  @IsNotEmpty()
-  uploadedByDoctorId: string;
-
-  @IsDateString()
-  issuedAt: string;
-
-  @IsString()
-  @IsOptional()
-  notes?: string;
-
-  @IsString()
-  @IsOptional()
-  sourceService?: string;
-
-  @IsDateString()
-  @IsOptional()
-  createdAt?: string;
-
-  @IsDateString()
-  @IsOptional()
-  updatedAt?: string;
-}
 
 export class ReportRefDto {
   @IsString()
@@ -167,18 +121,4 @@ export class CreatePatientDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
-
-  @IsArray()
-  @ArrayMaxSize(200)
-  @ValidateNested({ each: true })
-  @Type(() => PrescriptionRefDto)
-  @IsOptional()
-  prescriptions?: PrescriptionRefDto[];
-
-  @IsArray()
-  @ArrayMaxSize(200)
-  @ValidateNested({ each: true })
-  @Type(() => ReportRefDto)
-  @IsOptional()
-  reports?: ReportRefDto[];
 }
