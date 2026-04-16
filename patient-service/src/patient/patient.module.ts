@@ -12,6 +12,7 @@ import { PrescriptionProxyService } from './application/services/prescription-pr
 import { GatewayAuthGuard } from './presentation/guards/gateway-auth.guard';
 import { RolesGuard } from './presentation/guards/roles.guard';
 import { Reflector } from '@nestjs/core';
+import { FirebaseStorageService } from './application/services/firebase-storage.service';
 
 /**
  * Module definition for Patient.
@@ -26,6 +27,7 @@ import { Reflector } from '@nestjs/core';
   providers: [
     PatientService,
     PrescriptionProxyService,
+    FirebaseStorageService,
     GatewayAuthGuard,
     RolesGuard,
     Reflector,
