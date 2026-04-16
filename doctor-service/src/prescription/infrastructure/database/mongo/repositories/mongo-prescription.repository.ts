@@ -68,6 +68,16 @@ export class MongoPrescriptionRepository implements IPrescriptionRepository {
     return docs.map((d) => this.toEntity(d));
   }
 
+  async findByPatientId(
+    patientId: string,
+    options?: { statuses?: PrescriptionStatus[] },
+  ): Promise<PrescriptionEntity[]> {
+    const filter: Record<string, unknown> = { patientId };
+    if (options?.statuses?.length) filter.status = { $in: options.statuses };
+    const docs = await this.model.find(filter).sort({ issuedAt: -1 }).exec();
+    return docs.map((d) => this.toEntity(d));
+  }
+
   async updateStatus(
     id: string,
     status: PrescriptionStatus,

@@ -74,6 +74,16 @@ export class PrescriptionService {
     return p;
   }
 
+  async listForPatient(
+    patientId: string,
+    options: { includeHistory?: boolean },
+  ): Promise<PrescriptionEntity[]> {
+    const statuses = options.includeHistory
+      ? undefined
+      : [PrescriptionStatus.ACTIVE];
+    return this.prescriptionRepository.findByPatientId(patientId, { statuses });
+  }
+
   async amend(
     prescriptionId: string,
     dto: AmendPrescriptionDto,
