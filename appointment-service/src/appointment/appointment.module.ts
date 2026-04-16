@@ -22,7 +22,7 @@ import { APPOINTMENT_REPOSITORY } from './domain/repositories/appointment.reposi
 import { AppointmentService } from './application/services/appointment.service';
 
 // --- Presentation: Guard + Controller ---
-import { AuthGuard } from './presentation/guards/auth.guard';
+
 import { AppointmentController } from './presentation/controllers/appointment.controller';
 
 /**
@@ -68,8 +68,7 @@ import { AppointmentController } from './presentation/controllers/appointment.co
     PaymentClient,
     DoctorClient,
 
-    // --- Presentation: Guard ---
-    AuthGuard,
+
   ],
 })
 export class AppointmentModule {}
