@@ -19,7 +19,12 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { AppointmentService } from '../../application/services/appointment.service';
+import { BookAppointmentUseCase } from '../../application/usecases/book-appointment.usecase';
+import { GetAppointmentsUseCase } from '../../application/usecases/get-appointments.usecase';
+import { GetAvailableSlotsUseCase } from '../../application/usecases/get-available-slots.usecase';
+import { GetAppointmentByIdUseCase } from '../../application/usecases/get-appointment-by-id.usecase';
+import { UpdateAppointmentStatusUseCase } from '../../application/usecases/update-appointment-status.usecase';
+import { UpdateAppointmentUseCase } from '../../application/usecases/update-appointment.usecase';
 import { CreateAppointmentDto } from '../../application/dtos/create-appointment.dto';
 import { UpdateAppointmentStatusDto } from '../../application/dtos/update-appointment-status.dto';
 import { UpdateAppointmentDto } from '../../application/dtos/update-appointment.dto';
@@ -33,8 +38,8 @@ import { AppointmentTimeFilter } from '../../domain/enums/appointment-time-filte
  * All routes are guarded by AuthGuard (identity extraction + role parsing).
  *
  * Responsibility matrix:
- *   Controller  → extract request data, delegate to service, return response
- *   Service     → business logic, authorization (ownership + role checks)
+ *   Controller  → extract request data, delegate to usecase, return response
+ *   UseCase     → business logic, authorization (ownership + role checks)
  *   Repository  → persistence (never touched from here)
  *
  * Route ordering note:
@@ -48,10 +53,16 @@ import { AppointmentTimeFilter } from '../../domain/enums/appointment-time-filte
  */
 @ApiTags('appointments')
 @ApiBearerAuth()
-// @UseGuards(AuthGuard)
 @Controller('appointments')
 export class AppointmentController {
-  constructor(private readonly appointmentService: AppointmentService) {}
+  constructor(
+    private readonly bookAppointmentUseCase: BookAppointmentUseCase,
+    private readonly getAppointmentsUseCase: GetAppointmentsUseCase,
+    private readonly getAvailableSlotsUseCase: GetAvailableSlotsUseCase,
+    private readonly getAppointmentByIdUseCase: GetAppointmentByIdUseCase,
+    private readonly updateAppointmentStatusUseCase: UpdateAppointmentStatusUseCase,
+    private readonly updateAppointmentUseCase: UpdateAppointmentUseCase,
+  ) {}
 
   // -------------------------------------------------------------------------
   // POST /appointments — Book an appointment (Patient only)
@@ -79,7 +90,7 @@ export class AppointmentController {
     if (!userId || !role) {
       throw new BadRequestException('Missing x-user-id or x-user-role headers');
     }
-    return this.appointmentService.bookAppointment(dto, userId, role as UserRole);
+    return this.bookAppointmentUseCase.execute(dto, userId, role as UserRole);
   }
 
   // -------------------------------------------------------------------------
@@ -117,7 +128,7 @@ export class AppointmentController {
     const resolvedFilter =
       timeFilter && validFilters.includes(timeFilter) ? timeFilter : undefined;
 
-    return this.appointmentService.getAppointments(
+    return this.getAppointmentsUseCase.execute(
       userId,
       role as UserRole,
       resolvedFilter,
@@ -161,7 +172,7 @@ export class AppointmentController {
       );
     }
     return {
-      slots: await this.appointmentService.getAvailableSlots(doctorId, from, to),
+      slots: await this.getAvailableSlotsUseCase.execute(doctorId, from, to),
     };
   }
 
@@ -190,7 +201,7 @@ export class AppointmentController {
     if (!userId || !role) {
       throw new BadRequestException('Missing x-user-id or x-user-role headers');
     }
-    return this.appointmentService.getAppointmentById(id, userId, role as UserRole);
+    return this.getAppointmentByIdUseCase.execute(id, userId, role as UserRole);
   }
 
   // -------------------------------------------------------------------------
@@ -221,7 +232,7 @@ export class AppointmentController {
     if (!userId || !role) {
       throw new BadRequestException('Missing x-user-id or x-user-role headers');
     }
-    return this.appointmentService.updateStatus(id, dto, userId, role as UserRole);
+    return this.updateAppointmentStatusUseCase.execute(id, dto, userId, role as UserRole);
   }
 
   // -------------------------------------------------------------------------
@@ -253,7 +264,7 @@ export class AppointmentController {
     if (!userId || !role) {
       throw new BadRequestException('Missing x-user-id or x-user-role headers');
     }
-    return this.appointmentService.updateAppointment(
+    return this.updateAppointmentUseCase.execute(
       id,
       dto,
       userId,
