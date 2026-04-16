@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -115,6 +116,47 @@ export class AppointmentController {
       req.user.role,
       resolvedFilter,
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // GET /appointments/available-slots/:doctorId — Free slot proxy (all roles)
+  // IMPORTANT: Declared BEFORE GET /:id so 'available-slots' is not treated
+  // as an appointment ID by the NestJS router.
+  // -------------------------------------------------------------------------
+
+  @Get('available-slots/:doctorId')
+  @ApiOperation({
+    summary: 'Get available appointment slots for a doctor',
+    description:
+      'Proxies to the Doctor Service availability integration endpoint. ' +
+      'Returns UTC ISO 8601 slot start strings within the given time window, ' +
+      'filtered by the doctor\'s configured schedule (hours, breaks, overrides). ' +
+      'Returns [] if the doctor has no schedule or the Doctor Service is unreachable. ' +
+      'Maintains distribution transparency — frontend only talks to the Appointment Service.',
+  })
+  @ApiParam({ name: 'doctorId', description: "The doctor's auth user ID." })
+  @ApiQuery({ name: 'from', required: true, description: 'Window start — ISO 8601 UTC (e.g. 2026-04-20T00:00:00.000Z).' })
+  @ApiQuery({ name: 'to', required: true, description: 'Window end — ISO 8601 UTC (e.g. 2026-04-20T23:59:59.999Z).' })
+  @ApiResponse({
+    status: 200,
+    description: 'Array of available UTC slot start strings.',
+    schema: { example: { slots: ['2026-04-20T09:00:00.000Z', '2026-04-20T09:30:00.000Z'] } },
+  })
+  @ApiResponse({ status: 400, description: 'Missing or invalid from/to query params.' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid Authorization token.' })
+  async getAvailableSlots(
+    @Param('doctorId') doctorId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!from || !to) {
+      throw new BadRequestException(
+        'Query params "from" and "to" are required ISO 8601 date-time strings.',
+      );
+    }
+    return {
+      slots: await this.appointmentService.getAvailableSlots(doctorId, from, to),
+    };
   }
 
   // -------------------------------------------------------------------------
