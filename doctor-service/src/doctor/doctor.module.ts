@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { Reflector } from '@nestjs/core';
 import {
   DoctorSchemaClass,
   DoctorSchema,
@@ -18,10 +19,12 @@ import { DOCTOR_REPOSITORY } from './domain/repositories/doctor.repository.inter
   controllers: [DoctorController],
   providers: [
     DoctorService,
+    Reflector,
     {
       provide: DOCTOR_REPOSITORY,
       useClass: MongoDoctorRepository,
     },
   ],
+  exports: [DoctorService],
 })
 export class DoctorModule {}

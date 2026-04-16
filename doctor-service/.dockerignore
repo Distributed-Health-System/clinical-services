@@ -20,6 +20,8 @@ coverage
 .dockerignore
 .vscode
 .idea
+.github
+
 
 # Logs & OS
 *.log
@@ -33,3 +35,4 @@ eslint.config.mjs
 
 # Docs
 README.md
+*.md

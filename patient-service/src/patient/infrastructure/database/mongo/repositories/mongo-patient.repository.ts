@@ -2,14 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PatientDocument, PatientSchemaClass } from '../schemas/patient.schema';
-import {
-  IPatientRepository,
-} from '../../../../domain/repositories/patient.repository.interface';
-import {
-  PatientEntity,
-  PrescriptionRef,
-  ReportRef,
-} from '../../../../domain/entities/patient.entity';
+import { IPatientRepository } from '../../../../domain/repositories/patient.repository.interface';
+import { PatientEntity, ReportRef } from '../../../../domain/entities/patient.entity';
 
 @Injectable()
 export class MongoPatientRepository implements IPatientRepository {
@@ -21,6 +15,7 @@ export class MongoPatientRepository implements IPatientRepository {
   private toEntity(doc: PatientDocument): PatientEntity {
     const entity = new PatientEntity();
     entity.id = (doc._id as object).toString();
+    entity.userId = doc.userId;
     entity.firstName = doc.firstName;
     entity.lastName = doc.lastName;
     entity.email = doc.email;
@@ -49,6 +44,11 @@ export class MongoPatientRepository implements IPatientRepository {
 
   async findById(id: string): Promise<PatientEntity | null> {
     const doc = await this.patientModel.findOne({ _id: id, isActive: true }).exec();
+    return doc ? this.toEntity(doc) : null;
+  }
+
+  async findByUserId(userId: string): Promise<PatientEntity | null> {
+    const doc = await this.patientModel.findOne({ userId, isActive: true }).exec();
     return doc ? this.toEntity(doc) : null;
   }
 
@@ -84,39 +84,11 @@ export class MongoPatientRepository implements IPatientRepository {
     return result !== null;
   }
 
-  async addPrescription(
-    id: string,
-    prescription: PrescriptionRef,
-  ): Promise<PatientEntity | null> {
-    const doc = await this.patientModel
-      .findOneAndUpdate(
-        { _id: id, isActive: true },
-        { $push: { prescriptions: prescription } },
-        { new: true },
-      )
-      .exec();
-    return doc ? this.toEntity(doc) : null;
-  }
-
   async addReport(id: string, report: ReportRef): Promise<PatientEntity | null> {
     const doc = await this.patientModel
       .findOneAndUpdate(
         { _id: id, isActive: true },
         { $push: { reports: report } },
-        { new: true },
-      )
-      .exec();
-    return doc ? this.toEntity(doc) : null;
-  }
-
-  async removePrescription(
-    id: string,
-    prescriptionId: string,
-  ): Promise<PatientEntity | null> {
-    const doc = await this.patientModel
-      .findOneAndUpdate(
-        { _id: id, isActive: true },
-        { $pull: { prescriptions: { id: prescriptionId } } },
         { new: true },
       )
       .exec();

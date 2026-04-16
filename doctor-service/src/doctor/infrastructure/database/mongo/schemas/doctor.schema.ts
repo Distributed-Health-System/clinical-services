@@ -5,35 +5,41 @@ export type DoctorDocument = HydratedDocument<DoctorSchemaClass>;
 
 @Schema({ collection: 'doctors_amzal', timestamps: true })
 export class DoctorSchemaClass {
-  @Prop({ required: true })
-  firstName: string;
+  @Prop({ required: true, unique: true })
+  userId!: string;
 
   @Prop({ required: true })
-  lastName: string;
+  firstName!: string;
+
+  @Prop({ required: true })
+  lastName!: string;
 
   @Prop({ required: true, unique: true })
-  email: string;
+  email!: string;
 
   @Prop({ default: '' })
-  phone: string;
+  phone!: string;
 
   @Prop({ required: true })
-  specialization: string;
+  specialization!: string;
 
   @Prop({ required: true, unique: true })
-  licenseNumber: string;
+  licenseNumber!: string;
 
   @Prop({ default: 0 })
-  yearsOfExperience: number;
+  yearsOfExperience!: number;
 
   @Prop({ default: '' })
-  bio: string;
+  bio!: string;
 
   @Prop({ default: true })
-  isAvailable: boolean;
+  isAvailable!: boolean;
 
-  createdAt: Date;
-  updatedAt: Date;
+  @Prop({ default: false })
+  isApproved!: boolean;
+
+  createdAt!: Date;
+  updatedAt!: Date;
 }
 
 export const DoctorSchema = SchemaFactory.createForClass(DoctorSchemaClass);

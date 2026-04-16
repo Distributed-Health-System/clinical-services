@@ -14,7 +14,7 @@
     "start:prod": "node dist/main",
     "docker:build": "docker build -t doctor-service:latest .",
     "docker:run": "docker run -d --rm -p 3003:3003 --env-file .env doctor-service:latest",
-    "docker:push":"bash ./scripts/docker-build-push.sh",
+    "docker:push": "bash ./scripts/docker-build-push.sh",
     "k8s:deploy:bash": "bash ./scripts/k8s-deploy.sh",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@clerk/backend": "^3.2.3",
+    "@date-fns/tz": "^1.4.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.0.1",
@@ -33,6 +34,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
+    "date-fns": "^4.1.0",
     "mongoose": "^9.3.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
