@@ -6,6 +6,10 @@ export const PRESCRIPTION_REPOSITORY = 'PRESCRIPTION_REPOSITORY';
 export interface IPrescriptionRepository {
   create(data: Partial<PrescriptionEntity>): Promise<PrescriptionEntity>;
   findById(id: string): Promise<PrescriptionEntity | null>;
+  findByPatientId(
+    patientId: string,
+    options?: { statuses?: PrescriptionStatus[] },
+  ): Promise<PrescriptionEntity[]>;
   findByDoctorUserId(
     doctorUserId: string,
     options?: { patientId?: string; statuses?: PrescriptionStatus[] },

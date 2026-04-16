@@ -41,6 +41,7 @@ export class ReportRef {
 
 export class PatientEntity {
   id: string;
+  userId: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -55,6 +56,7 @@ export class PatientEntity {
   emergencyContactPhone: string;
   profileImageUrl: string;
   isActive: boolean;
+  /** Deprecated source of truth: prescriptions now come from doctor-service. */
   prescriptions: PrescriptionRef[];
   reports: ReportRef[];
   createdAt: Date;

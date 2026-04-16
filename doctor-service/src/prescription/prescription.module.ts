@@ -9,6 +9,8 @@ import { MongoPrescriptionRepository } from './infrastructure/database/mongo/rep
 import { PRESCRIPTION_REPOSITORY } from './domain/repositories/prescription.repository.interface';
 import { PrescriptionService } from './application/services/prescription.service';
 import { PrescriptionController } from './presentation/controllers/prescription.controller';
+import { PrescriptionIntegrationController } from './presentation/controllers/prescription-integration.controller';
+import { ServiceOrGatewayAuthGuard } from '../common/guards/service-or-gateway-auth.guard';
 
 @Module({
   imports: [
@@ -17,9 +19,10 @@ import { PrescriptionController } from './presentation/controllers/prescription.
       { name: PrescriptionSchemaClass.name, schema: PrescriptionSchema },
     ]),
   ],
-  controllers: [PrescriptionController],
+  controllers: [PrescriptionController, PrescriptionIntegrationController],
   providers: [
     PrescriptionService,
+    ServiceOrGatewayAuthGuard,
     {
       provide: PRESCRIPTION_REPOSITORY,
       useClass: MongoPrescriptionRepository,
