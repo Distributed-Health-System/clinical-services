@@ -1,27 +1,53 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import type { IPatientRepository } from '../../domain/repositories/patient.repository.interface';
 import { PATIENT_REPOSITORY } from '../../domain/repositories/patient.repository.interface';
-import { PatientEntity, PrescriptionRef, ReportRef } from '../../domain/entities/patient.entity';
+import { PatientEntity, ReportRef } from '../../domain/entities/patient.entity';
 import { PatientNotFoundException } from '../../domain/exceptions/patient-not-found.exception';
-import { CreatePatientDto, PrescriptionRefDto, ReportRefDto } from '../dtos/create-patient.dto';
+import { CreatePatientDto, ReportRefDto } from '../dtos/create-patient.dto';
 import { UpdatePatientDto } from '../dtos/update-patient.dto';
+import { PrescriptionProxyService } from './prescription-proxy.service';
 
 @Injectable()
 export class PatientService {
   constructor(
     @Inject(PATIENT_REPOSITORY)
     private readonly patientRepository: IPatientRepository,
+    private readonly prescriptionProxy: PrescriptionProxyService,
   ) {}
 
   private toDuplicateEmailConflict(error: unknown): never {
     const err = error as { code?: number; keyPattern?: Record<string, unknown> };
-    if (err?.code === 11000 && err.keyPattern?.email) {
-      throw new ConflictException('Patient with this email already exists.');
+    if (err?.code === 11000 && (err.keyPattern?.email || err.keyPattern?.userId)) {
+      throw new ConflictException('Patient with this identity already exists.');
     }
     throw error;
   }
 
-  findAll(): Promise<PatientEntity[]> {
+  private async assertCanAccessPatient(
+    patientId: string,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<PatientEntity> {
+    const patient = await this.findById(patientId);
+    if (
+      requestingUserRole !== 'admin' &&
+      requestingUserRole !== 'doctor' &&
+      patient.userId !== requestingUserId
+    ) {
+      throw new ForbiddenException('You can only access your own patient profile.');
+    }
+    return patient;
+  }
+
+  async findAll(requestingUserRole: string): Promise<PatientEntity[]> {
+    if (requestingUserRole !== 'admin') {
+      throw new ForbiddenException('Only admin can list all patients.');
+    }
     return this.patientRepository.findAll();
   }
 
@@ -31,52 +57,47 @@ export class PatientService {
     return patient;
   }
 
-  async create(dto: CreatePatientDto): Promise<PatientEntity> {
+  async getByIdForRequester(
+    id: string,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<PatientEntity> {
+    return this.assertCanAccessPatient(id, requestingUserId, requestingUserRole);
+  }
+
+  async findMyByUserId(userId: string): Promise<PatientEntity> {
+    const patient = await this.patientRepository.findByUserId(userId);
+    if (!patient) throw new PatientNotFoundException(userId);
+    return patient;
+  }
+
+  async create(dto: CreatePatientDto, userId: string): Promise<PatientEntity> {
+    const existing = await this.patientRepository.findByUserId(userId);
+    if (existing) {
+      throw new ConflictException('Patient profile already exists for this user.');
+    }
     try {
       return await this.patientRepository.create({
         ...dto,
+        userId,
         dateOfBirth: new Date(dto.dateOfBirth),
-        prescriptions: (dto.prescriptions ?? []).map((p) => ({
-          ...p,
-          issuedAt: new Date(p.issuedAt),
-          sourceService: p.sourceService ?? 'doctor-service',
-          createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
-          updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date(),
-        })),
-        reports: (dto.reports ?? []).map((r) => ({
-          ...r,
-          uploadedBy: 'patient',
-          uploadedAt: new Date(r.uploadedAt),
-          sourceService: r.sourceService ?? 'patient-service',
-          createdAt: r.createdAt ? new Date(r.createdAt) : new Date(),
-          updatedAt: r.updatedAt ? new Date(r.updatedAt) : new Date(),
-        })),
       });
     } catch (error) {
       this.toDuplicateEmailConflict(error);
     }
   }
 
-  async update(id: string, dto: UpdatePatientDto): Promise<PatientEntity> {
+  async update(
+    id: string,
+    dto: UpdatePatientDto,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<PatientEntity> {
+    await this.assertCanAccessPatient(id, requestingUserId, requestingUserRole);
     try {
       const updated = await this.patientRepository.update(id, {
         ...dto,
         dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
-        prescriptions: dto.prescriptions?.map((p) => ({
-          ...p,
-          issuedAt: new Date(p.issuedAt),
-          sourceService: p.sourceService ?? 'doctor-service',
-          createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
-          updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date(),
-        })),
-        reports: dto.reports?.map((r) => ({
-          ...r,
-          uploadedBy: 'patient',
-          uploadedAt: new Date(r.uploadedAt),
-          sourceService: r.sourceService ?? 'patient-service',
-          createdAt: r.createdAt ? new Date(r.createdAt) : new Date(),
-          updatedAt: r.updatedAt ? new Date(r.updatedAt) : new Date(),
-        })),
       });
       if (!updated) throw new PatientNotFoundException(id);
       return updated;
@@ -85,30 +106,41 @@ export class PatientService {
     }
   }
 
-  async delete(id: string): Promise<void> {
+  async updateMy(
+    userId: string,
+    dto: UpdatePatientDto,
+  ): Promise<PatientEntity> {
+    const me = await this.findMyByUserId(userId);
+    return this.update(me.id, dto, userId, 'patient');
+  }
+
+  async delete(id: string, requestingUserRole: string): Promise<void> {
+    if (requestingUserRole !== 'admin') {
+      throw new ForbiddenException('Only admin can delete patient profiles.');
+    }
     const deleted = await this.patientRepository.delete(id);
     if (!deleted) throw new PatientNotFoundException(id);
   }
 
-  async addPrescription(id: string, dto: PrescriptionRefDto): Promise<PatientEntity> {
-    const now = new Date();
-    const prescription: PrescriptionRef = {
-      ...dto,
-      issuedAt: new Date(dto.issuedAt),
-      sourceService: dto.sourceService ?? 'doctor-service',
-      createdAt: dto.createdAt ? new Date(dto.createdAt) : now,
-      updatedAt: dto.updatedAt ? new Date(dto.updatedAt) : now,
-    };
-    const updated = await this.patientRepository.addPrescription(id, prescription);
-    if (!updated) throw new PatientNotFoundException(id);
-    return updated;
-  }
-
-  async addReport(id: string, dto: ReportRefDto): Promise<PatientEntity> {
+  async addReport(
+    id: string,
+    dto: ReportRefDto,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<PatientEntity> {
+    const patient = await this.assertCanAccessPatient(
+      id,
+      requestingUserId,
+      requestingUserRole,
+    );
+    if (requestingUserRole === 'patient' && patient.userId !== requestingUserId) {
+      throw new ForbiddenException('Patients can only upload their own reports.');
+    }
     const now = new Date();
     const report: ReportRef = {
       ...dto,
       uploadedBy: 'patient',
+      uploadedById: requestingUserId,
       uploadedAt: new Date(dto.uploadedAt),
       sourceService: dto.sourceService ?? 'patient-service',
       createdAt: dto.createdAt ? new Date(dto.createdAt) : now,
@@ -119,13 +151,13 @@ export class PatientService {
     return updated;
   }
 
-  async removePrescription(id: string, prescriptionId: string): Promise<PatientEntity> {
-    const updated = await this.patientRepository.removePrescription(id, prescriptionId);
-    if (!updated) throw new PatientNotFoundException(id);
-    return updated;
-  }
-
-  async removeReport(id: string, reportId: string): Promise<PatientEntity> {
+  async removeReport(
+    id: string,
+    reportId: string,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<PatientEntity> {
+    await this.assertCanAccessPatient(id, requestingUserId, requestingUserRole);
     const updated = await this.patientRepository.removeReport(id, reportId);
     if (!updated) throw new PatientNotFoundException(id);
     return updated;
@@ -133,29 +165,12 @@ export class PatientService {
 
   async getPrescriptions(
     id: string,
-    options: {
-      uploadedByDoctorId?: string;
-      limit?: number;
-      offset?: number;
-      sort?: string;
-    },
-  ): Promise<PrescriptionRef[]> {
-    const patient = await this.findById(id);
-    let prescriptions = [...patient.prescriptions];
-
-    if (options.uploadedByDoctorId) {
-      prescriptions = prescriptions.filter(
-        (p) => p.uploadedByDoctorId === options.uploadedByDoctorId,
-      );
-    }
-
-    prescriptions = this.sortRefs(
-      prescriptions,
-      options.sort,
-      ['issuedAt', 'createdAt', 'updatedAt', 'title'],
-      'issuedAt',
-    );
-    return this.paginate(prescriptions, options.limit, options.offset);
+    options: { includeHistory?: boolean },
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<unknown> {
+    const patient = await this.assertCanAccessPatient(id, requestingUserId, requestingUserRole);
+    return this.prescriptionProxy.listForPatient(patient.id, options);
   }
 
   async getReports(
@@ -166,8 +181,10 @@ export class PatientService {
       offset?: number;
       sort?: string;
     },
+    requestingUserId: string,
+    requestingUserRole: string,
   ): Promise<ReportRef[]> {
-    const patient = await this.findById(id);
+    const patient = await this.assertCanAccessPatient(id, requestingUserId, requestingUserRole);
     let reports = [...patient.reports];
 
     if (options.category) {
@@ -198,7 +215,6 @@ export class PatientService {
     const [fieldRaw, directionRaw] = (sort ?? `${defaultField}:desc`).split(':');
     const field = allowedFields.includes(fieldRaw) ? fieldRaw : defaultField;
     const direction = directionRaw === 'asc' ? 1 : -1;
-
     return items.sort((a, b) => {
       const av = (a as Record<string, unknown>)[field];
       const bv = (b as Record<string, unknown>)[field];
