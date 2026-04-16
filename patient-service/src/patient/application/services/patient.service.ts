@@ -11,6 +11,12 @@ import { PatientNotFoundException } from '../../domain/exceptions/patient-not-fo
 import { CreatePatientDto, ReportRefDto } from '../dtos/create-patient.dto';
 import { UpdatePatientDto } from '../dtos/update-patient.dto';
 import { PrescriptionProxyService } from './prescription-proxy.service';
+import {
+  CreateReportUploadIntentDto,
+  FinalizeReportUploadDto,
+} from '../dtos/report-upload.dto';
+import { FirebaseStorageService } from './firebase-storage.service';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class PatientService {
@@ -18,6 +24,7 @@ export class PatientService {
     @Inject(PATIENT_REPOSITORY)
     private readonly patientRepository: IPatientRepository,
     private readonly prescriptionProxy: PrescriptionProxyService,
+    private readonly firebaseStorage: FirebaseStorageService,
   ) {}
 
   private toDuplicateEmailConflict(error: unknown): never {
@@ -149,6 +156,97 @@ export class PatientService {
     const updated = await this.patientRepository.addReport(id, report);
     if (!updated) throw new PatientNotFoundException(id);
     return updated;
+  }
+
+  async createReportUploadIntent(
+    id: string,
+    dto: CreateReportUploadIntentDto,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<{
+    reportId: string;
+    blobKey: string;
+    uploadUrl: string;
+    expiresAt: string;
+    requiredHeaders: { 'Content-Type': string };
+  }> {
+    const patient = await this.assertCanAccessPatient(
+      id,
+      requestingUserId,
+      requestingUserRole,
+    );
+    if (requestingUserRole === 'patient' && patient.userId !== requestingUserId) {
+      throw new ForbiddenException('Patients can only upload their own reports.');
+    }
+
+    const reportId = randomUUID();
+    const safeFilename = dto.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const blobKey = `patients/${patient.id}/reports/${reportId}/${safeFilename}`;
+    const signed = await this.firebaseStorage.createUploadUrl(blobKey, dto.mimeType);
+
+    return {
+      reportId,
+      blobKey,
+      uploadUrl: signed.uploadUrl,
+      expiresAt: signed.expiresAt,
+      requiredHeaders: {
+        'Content-Type': dto.mimeType,
+      },
+    };
+  }
+
+  async finalizeReportUpload(
+    id: string,
+    dto: FinalizeReportUploadDto,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<PatientEntity> {
+    const patient = await this.assertCanAccessPatient(
+      id,
+      requestingUserId,
+      requestingUserRole,
+    );
+    if (requestingUserRole === 'patient' && patient.userId !== requestingUserId) {
+      throw new ForbiddenException('Patients can only finalize their own reports.');
+    }
+    await this.firebaseStorage.ensureBlobExists(dto.blobKey);
+
+    const now = new Date();
+    const report: ReportRef = {
+      id: dto.reportId,
+      title: dto.title,
+      blobKey: dto.blobKey,
+      fileUrl: this.firebaseStorage.makeInternalFileUrl(dto.blobKey),
+      mimeType: dto.mimeType,
+      uploadedBy: 'patient',
+      uploadedById: requestingUserId,
+      uploadedAt: new Date(dto.uploadedAt),
+      category: dto.category,
+      sourceService: 'patient-service',
+      createdAt: now,
+      updatedAt: now,
+    };
+    const updated = await this.patientRepository.addReport(id, report);
+    if (!updated) throw new PatientNotFoundException(id);
+    return updated;
+  }
+
+  async getReportDownloadUrl(
+    id: string,
+    reportId: string,
+    requestingUserId: string,
+    requestingUserRole: string,
+  ): Promise<{ reportId: string; blobKey: string; downloadUrl: string; expiresAt: string }> {
+    const patient = await this.assertCanAccessPatient(id, requestingUserId, requestingUserRole);
+    const report = patient.reports.find((r) => r.id === reportId);
+    if (!report) throw new PatientNotFoundException(reportId);
+    const signed = await this.firebaseStorage.createDownloadUrl(report.blobKey);
+    return {
+      reportId: report.id,
+      blobKey: report.blobKey,
+      downloadUrl: signed.downloadUrl,
+      expiresAt: signed.expiresAt,
+    };
   }
 
   async removeReport(
