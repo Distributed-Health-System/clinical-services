@@ -37,11 +37,12 @@ export class DoctorController {
     return this.doctorService.findById(id, req['userId'], req['userRole']);
   }
 
-  // Doctor self-registers — userId comes from gateway header
+  // Public — doctor self-registers, no token required
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreateDoctorDto, @Req() req: Request) {
-    return this.doctorService.create(dto, req['userId']);
+  @UseGuards()
+  create(@Body() dto: CreateDoctorDto) {
+    return this.doctorService.create(dto);
   }
 
   // Doctor edits own profile, or admin edits any

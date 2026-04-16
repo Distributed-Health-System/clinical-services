@@ -9,6 +9,7 @@ import { MongoDoctorRepository } from './infrastructure/database/mongo/repositor
 import { DoctorService } from './application/services/doctor.service';
 import { DoctorController } from './presentation/controllers/doctor.controller';
 import { DOCTOR_REPOSITORY } from './domain/repositories/doctor.repository.interface';
+import { KeycloakAdminService } from './infrastructure/keycloak/keycloak-admin.service';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { DOCTOR_REPOSITORY } from './domain/repositories/doctor.repository.inter
   controllers: [DoctorController],
   providers: [
     DoctorService,
+    KeycloakAdminService,
     Reflector,
     {
       provide: DOCTOR_REPOSITORY,

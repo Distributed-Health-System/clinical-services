@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type { IDoctorRepository } from '../../domain/repositories/doctor.repository.interface';
@@ -10,12 +11,16 @@ import { DoctorEntity } from '../../domain/entities/doctor.entity';
 import { DoctorNotFoundException } from '../../domain/exceptions/doctor-not-found.exception';
 import { CreateDoctorDto } from '../dtos/create-doctor.dto';
 import { UpdateDoctorDto } from '../dtos/update-doctor.dto';
+import { KeycloakAdminService } from '../../infrastructure/keycloak/keycloak-admin.service';
 
 @Injectable()
 export class DoctorService {
+  private readonly logger = new Logger(DoctorService.name);
+
   constructor(
     @Inject(DOCTOR_REPOSITORY)
     private readonly doctorRepository: IDoctorRepository,
+    private readonly keycloakAdminService: KeycloakAdminService,
   ) {}
 
   findAll(specialization?: string): Promise<DoctorEntity[]> {
@@ -44,8 +49,23 @@ export class DoctorService {
     return doctor;
   }
 
-  async create(dto: CreateDoctorDto, userId: string): Promise<DoctorEntity> {
-    return this.doctorRepository.create({ ...dto, userId, isApproved: false });
+  async create(dto: CreateDoctorDto): Promise<DoctorEntity> {
+    const { password, ...profile } = dto;
+
+    const userId = await this.keycloakAdminService.createDoctorUser(
+      dto.firstName,
+      dto.lastName,
+      dto.email,
+      password,
+    );
+
+    try {
+      return await this.doctorRepository.create({ ...profile, userId, isApproved: false });
+    } catch (err) {
+      this.logger.error(`DB save failed after Keycloak user created (${userId}), rolling back`);
+      await this.keycloakAdminService.deleteUser(userId);
+      throw err;
+    }
   }
 
   async update(
