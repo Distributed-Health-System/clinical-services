@@ -8,6 +8,10 @@ import { MongoPatientRepository } from './infrastructure/database/mongo/reposito
 import { PatientService } from './application/services/patient.service';
 import { PatientController } from './presentation/controllers/patient.controller';
 import { PATIENT_REPOSITORY } from './domain/repositories/patient.repository.interface';
+import { PrescriptionProxyService } from './application/services/prescription-proxy.service';
+import { GatewayAuthGuard } from './presentation/guards/gateway-auth.guard';
+import { RolesGuard } from './presentation/guards/roles.guard';
+import { Reflector } from '@nestjs/core';
 
 /**
  * Module definition for Patient.
@@ -21,6 +25,10 @@ import { PATIENT_REPOSITORY } from './domain/repositories/patient.repository.int
   controllers: [PatientController],
   providers: [
     PatientService,
+    PrescriptionProxyService,
+    GatewayAuthGuard,
+    RolesGuard,
+    Reflector,
     {
       provide: PATIENT_REPOSITORY,
       useClass: MongoPatientRepository,
