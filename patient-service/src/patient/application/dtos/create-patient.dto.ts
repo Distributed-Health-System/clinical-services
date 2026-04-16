@@ -75,6 +75,10 @@ export class CreatePatientDto {
   @IsNotEmpty()
   email: string;
 
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+
   @Type(() => Date)
   @IsDate()
   @MaxDate(new Date())
