@@ -23,7 +23,10 @@ Auth headers expected on protected routes:
 ## Reports (patient uploaded)
 
 - `GET /patients/:id/reports` (roles: patient self, doctor, admin) — list/filter reports.
-- `POST /patients/:id/reports` (role: `patient`, self only) — add report reference.
+- `POST /patients/:id/reports/upload-intent` (role: `patient`, self only) — create Firebase signed upload URL.
+- `POST /patients/:id/reports/finalize` (role: `patient`, self only) — persist report metadata after successful blob upload.
+- `GET /patients/:id/reports/:reportId/download-url` (roles: patient self, doctor, admin) — get short-lived signed download URL.
+- `POST /patients/:id/reports` (role: `patient`, self only) — legacy direct metadata add (kept for compatibility).
 - `DELETE /patients/:id/reports/:reportId` (roles: patient self, admin) — remove report.
 
 Query options for list:
@@ -48,3 +51,7 @@ Notes:
 - `MONGODB_URI`
 - `DOCTOR_SERVICE_URL` (for prescription proxy)
 - `SERVICE_API_KEY` (optional; used for service-to-service auth with doctor-service)
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_STORAGE_BUCKET`
+- `FIREBASE_SERVICE_ACCOUNT_PATH` or `FIREBASE_SERVICE_ACCOUNT_JSON`
+- `FIREBASE_SIGNED_URL_EXPIRY_SECONDS` (optional, default 600)

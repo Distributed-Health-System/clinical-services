@@ -17,6 +17,10 @@ import type { Request } from 'express';
 import { PatientService } from '../../application/services/patient.service';
 import { CreatePatientDto, ReportRefDto } from '../../application/dtos/create-patient.dto';
 import { UpdatePatientDto } from '../../application/dtos/update-patient.dto';
+import {
+  CreateReportUploadIntentDto,
+  FinalizeReportUploadDto,
+} from '../../application/dtos/report-upload.dto';
 import { GatewayAuthGuard } from '../guards/gateway-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/roles.decorator';
@@ -115,6 +119,50 @@ export class PatientController {
     return this.patientService.addReport(
       id,
       dto,
+      req['userId'] as string,
+      req['userRole'] as string,
+    );
+  }
+
+  @Post(':id/reports/upload-intent')
+  @Roles('patient')
+  createReportUploadIntent(
+    @Param('id') id: string,
+    @Body() dto: CreateReportUploadIntentDto,
+    @Req() req: Request,
+  ) {
+    return this.patientService.createReportUploadIntent(
+      id,
+      dto,
+      req['userId'] as string,
+      req['userRole'] as string,
+    );
+  }
+
+  @Post(':id/reports/finalize')
+  @Roles('patient')
+  finalizeReportUpload(
+    @Param('id') id: string,
+    @Body() dto: FinalizeReportUploadDto,
+    @Req() req: Request,
+  ) {
+    return this.patientService.finalizeReportUpload(
+      id,
+      dto,
+      req['userId'] as string,
+      req['userRole'] as string,
+    );
+  }
+
+  @Get(':id/reports/:reportId/download-url')
+  getReportDownloadUrl(
+    @Param('id') id: string,
+    @Param('reportId') reportId: string,
+    @Req() req: Request,
+  ) {
+    return this.patientService.getReportDownloadUrl(
+      id,
+      reportId,
       req['userId'] as string,
       req['userRole'] as string,
     );
