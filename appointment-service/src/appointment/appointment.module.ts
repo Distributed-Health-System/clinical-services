@@ -13,6 +13,7 @@ import { MongoAppointmentRepository } from './infrastructure/database/mongo/repo
 // --- Infrastructure: External Service Clients ---
 import { TelemedicineClient } from './infrastructure/external/telemedicine.client';
 import { PaymentClient } from './infrastructure/external/payment.client';
+import { DoctorClient } from './infrastructure/external/doctor.client';
 
 // --- Domain: DI Token ---
 import { APPOINTMENT_REPOSITORY } from './domain/repositories/appointment.repository.interface';
@@ -65,6 +66,7 @@ import { AppointmentController } from './presentation/controllers/appointment.co
     // --- Infrastructure: External Clients ---
     TelemedicineClient,
     PaymentClient,
+    DoctorClient,
 
     // --- Presentation: Guard ---
     AuthGuard,

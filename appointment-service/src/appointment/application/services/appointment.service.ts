@@ -16,6 +16,7 @@ import { UserRole } from '../../domain/enums/user-role.enum';
 import { SLOT_DURATION_MINUTES } from '../../domain/constants/appointment.constants';
 import { TelemedicineClient } from '../../infrastructure/external/telemedicine.client';
 import { PaymentClient } from '../../infrastructure/external/payment.client';
+import { DoctorClient } from '../../infrastructure/external/doctor.client';
 import { CreateAppointmentDto } from '../dtos/create-appointment.dto';
 import { UpdateAppointmentStatusDto } from '../dtos/update-appointment-status.dto';
 import { UpdateAppointmentDto } from '../dtos/update-appointment.dto';
@@ -45,6 +46,7 @@ export class AppointmentService {
 
     private readonly telemedicineClient: TelemedicineClient,
     private readonly paymentClient: PaymentClient,
+    private readonly doctorClient: DoctorClient,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -71,11 +73,27 @@ export class AppointmentService {
       throw new ForbiddenException('Only patients can book appointments.');
     }
 
-    // --- Slot Validation ---
+    // --- Slot Validation (local format check) ---
     const slotStart = new Date(dto.slotStart);
     this._validateSlotDate(slotStart);
 
-    // --- Conflict Detection (parallel queries for performance) ---
+    // --- Doctor Availability Validation (Doctor Service) ---
+    // Verifies the slot falls within the doctor's configured working hours,
+    // respecting breaks and date overrides. This is separate from conflict
+    // detection — the Doctor Service does not know about existing bookings.
+    const slotValidation = await this.doctorClient.validateSlot(
+      dto.doctorId,
+      slotStart,
+    );
+    if (!slotValidation.valid) {
+      throw new BadRequestException(
+        `This time slot is not available: ${
+          slotValidation.reason ?? 'outside doctor availability.'
+        }`,
+      );
+    }
+
+    // --- Conflict Detection — own DB (parallel queries for performance) ---
     const [doctorConflict, patientConflict] = await Promise.all([
       this.appointmentRepository.hasSlotConflictForDoctor(dto.doctorId, slotStart),
       this.appointmentRepository.hasSlotConflictForPatient(patientId, slotStart),
@@ -332,7 +350,20 @@ export class AppointmentService {
       const newSlotStart = new Date(dto.slotStart);
       this._validateSlotDate(newSlotStart);
 
-      // Re-check conflicts for the new slot
+      // Re-validate new slot against the doctor's schedule
+      const slotValidation = await this.doctorClient.validateSlot(
+        appointment.doctorId,
+        newSlotStart,
+      );
+      if (!slotValidation.valid) {
+        throw new BadRequestException(
+          `The new time slot is not available: ${
+            slotValidation.reason ?? 'outside doctor availability.'
+          }`,
+        );
+      }
+
+      // Re-check own DB conflicts for the new slot
       const [doctorConflict, patientConflict] = await Promise.all([
         this.appointmentRepository.hasSlotConflictForDoctor(
           appointment.doctorId,
@@ -377,6 +408,41 @@ export class AppointmentService {
       `Appointment ${id} updated by patient ${userId}. Changes: ${JSON.stringify(partial)}`,
     );
     return updated;
+  }
+
+  // -------------------------------------------------------------------------
+  // Available Slots Proxy (proxies to Doctor Service)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Returns free slot start times for a doctor within a date range.
+   *
+   * Proxies the request to the Doctor Service's integration endpoint so the
+   * frontend never needs to know the Doctor Service exists (distribution transparency).
+   * Returns [] if the Doctor Service is unavailable or the doctor has no schedule.
+   *
+   * @param doctorId - The doctor's auth user ID.
+   * @param from     - ISO 8601 string for the start of the query window.
+   * @param to       - ISO 8601 string for the end of the query window.
+   */
+  async getAvailableSlots(
+    doctorId: string,
+    from: string,
+    to: string,
+  ): Promise<string[]> {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      throw new BadRequestException(
+        'Query params "from" and "to" must be valid ISO 8601 date-time strings.',
+      );
+    }
+    if (fromDate >= toDate) {
+      throw new BadRequestException('"from" must be earlier than "to".');
+    }
+
+    return this.doctorClient.getFreeSlots(doctorId, fromDate, toDate);
   }
 
   // -------------------------------------------------------------------------
