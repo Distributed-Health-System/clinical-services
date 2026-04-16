@@ -210,6 +210,15 @@ Example:
 
 JSON body: `{ "doctorUserId": "<same as appointment doctorId>", "slotStart": "2026-04-20T10:30:00.000Z" }`
 
+### List prescriptions by patient (for patient-service integration)
+
+- **Direct:** `GET http://localhost:3003/doctors/integration/patients/{patientId}/prescriptions`
+- **Gateway:** `GET http://localhost:3001/doctors/integration/patients/{patientId}/prescriptions`
+
+Optional query:
+
+- `includeHistory=true` to include `AMENDED` and `REVOKED`; default returns active prescriptions.
+
 ---
 
 ## Quick reference (direct service, port 3003)
@@ -238,5 +247,6 @@ JSON body: `{ "doctorUserId": "<same as appointment doctorId>", "slotStart": "20
 | DELETE | `http://localhost:3003/doctors/me/availability/overrides/{date}` |
 | GET | `http://localhost:3003/doctors/integration/availability/{doctorUserId}/free-slots?from=...&to=...` |
 | POST | `http://localhost:3003/doctors/integration/availability/validate-slot` |
+| GET | `http://localhost:3003/doctors/integration/patients/{patientId}/prescriptions` |
 
 For gateway calls, use `http://localhost:3001` instead of `http://localhost:3003` with the **same path and query string**.
