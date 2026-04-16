@@ -20,6 +20,8 @@ coverage
 .dockerignore
 .vscode
 .idea
+.github
+
 
 # Logs & OS
 *.log
@@ -34,3 +36,4 @@ nest-cli.json
 
 # Docs
 README.md
+*.md
