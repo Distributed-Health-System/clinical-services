@@ -258,6 +258,7 @@ export class MongoAppointmentRepository implements IAppointmentRepository {
     entity.telemedicineLinkDoctor = doc.telemedicineLinkDoctor ?? undefined;
     entity.telemedicineLinkPatient = doc.telemedicineLinkPatient ?? undefined;
     entity.paymentStatus = doc.paymentStatus;
+    entity.paymentTransactionId = doc.paymentTransactionId ?? undefined;
     return entity;
   }
 }
