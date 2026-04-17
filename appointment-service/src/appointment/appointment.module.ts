@@ -25,6 +25,7 @@ import { GetAvailableSlotsUseCase } from './application/usecases/get-available-s
 import { GetAppointmentByIdUseCase } from './application/usecases/get-appointment-by-id.usecase';
 import { UpdateAppointmentStatusUseCase } from './application/usecases/update-appointment-status.usecase';
 import { UpdateAppointmentUseCase } from './application/usecases/update-appointment.usecase';
+import { ProcessPaymentWebhookUseCase } from './application/usecases/process-payment-webhook.usecase';
 import { AppointmentValidationService } from './application/services/appointment-validation.service';
 
 
@@ -61,6 +62,7 @@ import { AppointmentController } from './presentation/controllers/appointment.co
     GetAppointmentByIdUseCase,
     UpdateAppointmentStatusUseCase,
     UpdateAppointmentUseCase,
+    ProcessPaymentWebhookUseCase,
     AppointmentValidationService,
 
     // --- Infrastructure: Repository (bound to domain interface token) ---

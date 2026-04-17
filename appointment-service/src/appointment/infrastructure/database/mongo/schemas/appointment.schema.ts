@@ -90,6 +90,12 @@ export class Appointment {
    */
   @Prop({ required: true, default: 'PENDING' })
   paymentStatus: string;
+
+  /**
+   * The transaction ID provided by the Payment Service indicating proof of payment.
+   */
+  @Prop({ required: false, default: null })
+  paymentTransactionId: string;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);

@@ -25,9 +25,11 @@ import { GetAvailableSlotsUseCase } from '../../application/usecases/get-availab
 import { GetAppointmentByIdUseCase } from '../../application/usecases/get-appointment-by-id.usecase';
 import { UpdateAppointmentStatusUseCase } from '../../application/usecases/update-appointment-status.usecase';
 import { UpdateAppointmentUseCase } from '../../application/usecases/update-appointment.usecase';
+import { ProcessPaymentWebhookUseCase } from '../../application/usecases/process-payment-webhook.usecase';
 import { CreateAppointmentDto } from '../../application/dtos/create-appointment.dto';
 import { UpdateAppointmentStatusDto } from '../../application/dtos/update-appointment-status.dto';
 import { UpdateAppointmentDto } from '../../application/dtos/update-appointment.dto';
+import { PaymentWebhookDto } from '../../application/dtos/payment-webhook.dto';
 import { UserRole } from '../../domain/enums/user-role.enum';
 import { AppointmentTimeFilter } from '../../domain/enums/appointment-time-filter.enum';
 
@@ -62,6 +64,7 @@ export class AppointmentController {
     private readonly getAppointmentByIdUseCase: GetAppointmentByIdUseCase,
     private readonly updateAppointmentStatusUseCase: UpdateAppointmentStatusUseCase,
     private readonly updateAppointmentUseCase: UpdateAppointmentUseCase,
+    private readonly processPaymentWebhookUseCase: ProcessPaymentWebhookUseCase,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -272,5 +275,19 @@ export class AppointmentController {
       userId,
       role as UserRole,
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // POST /appointments/webhook/payment — System Webhook
+  // -------------------------------------------------------------------------
+
+  @Post('webhook/payment')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Internal System Webhook - Process Payment Result',
+    description: 'Internal endpoint for Payment Service to report checkout completion.',
+  })
+  async processPaymentWebhook(@Body() dto: PaymentWebhookDto) {
+    return this.processPaymentWebhookUseCase.execute(dto);
   }
 }

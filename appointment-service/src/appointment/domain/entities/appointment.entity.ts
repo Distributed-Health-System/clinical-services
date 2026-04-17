@@ -95,4 +95,10 @@ export class Appointment {
    *   'FAILED'    — payment was unsuccessful
    */
   paymentStatus: string;
+
+  /**
+   * The transaction ID provided by the Payment Service indicating proof of payment.
+   * Populated asynchronously via webhook.
+   */
+  paymentTransactionId?: string;
 }
