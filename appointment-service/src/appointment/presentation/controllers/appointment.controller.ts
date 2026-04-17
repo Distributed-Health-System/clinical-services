@@ -32,6 +32,11 @@ import { UpdateAppointmentDto } from '../../application/dtos/update-appointment.
 import { PaymentWebhookDto } from '../../application/dtos/payment-webhook.dto';
 import { UserRole } from '../../domain/enums/user-role.enum';
 import { AppointmentTimeFilter } from '../../domain/enums/appointment-time-filter.enum';
+import { AppointmentResponseDto } from '../dtos/appointment-response.dto';
+import {
+  toAppointmentResponse,
+  toAppointmentResponseList,
+} from '../mappers/appointment-response.mapper';
 
 /**
  * AppointmentController — Presentation Layer
@@ -101,11 +106,16 @@ export class AppointmentController {
     @Body() dto: CreateAppointmentDto,
     @Headers('x-user-id') userId: string,
     @Headers('x-user-role') role: string,
-  ) {
+  ): Promise<AppointmentResponseDto> {
     if (!userId || !role) {
       throw new BadRequestException('Missing x-user-id or x-user-role headers');
     }
-    return this.bookAppointmentUseCase.execute(dto, userId, role as UserRole);
+    const appointment = await this.bookAppointmentUseCase.execute(
+      dto,
+      userId,
+      role as UserRole,
+    );
+    return toAppointmentResponse(appointment, role);
   }
 
   // -------------------------------------------------------------------------
@@ -128,7 +138,12 @@ export class AppointmentController {
     enum: AppointmentTimeFilter,
     description: 'Temporal filter: PAST, CURRENT, or UPCOMING.',
   })
-  @ApiResponse({ status: 200, description: 'List of appointments returned.' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of appointments returned.',
+    type: AppointmentResponseDto,
+    isArray: true,
+  })
   @ApiResponse({
     status: 401,
     description: 'Missing or invalid Authorization token.',
@@ -137,7 +152,7 @@ export class AppointmentController {
     @Headers('x-user-id') userId: string,
     @Headers('x-user-role') role: string,
     @Query('filter') timeFilter?: AppointmentTimeFilter,
-  ) {
+  ): Promise<AppointmentResponseDto[]> {
     if (!userId || !role) {
       throw new BadRequestException('Missing x-user-id or x-user-role headers');
     }
@@ -146,11 +161,12 @@ export class AppointmentController {
     const resolvedFilter =
       timeFilter && validFilters.includes(timeFilter) ? timeFilter : undefined;
 
-    return this.getAppointmentsUseCase.execute(
+    const appointments = await this.getAppointmentsUseCase.execute(
       userId,
       role as UserRole,
       resolvedFilter,
     );
+    return toAppointmentResponseList(appointments, role);
   }
 
   // -------------------------------------------------------------------------
@@ -225,7 +241,11 @@ export class AppointmentController {
       'ADMIN can view any.',
   })
   @ApiParam({ name: 'id', description: 'The appointment MongoDB ObjectId.' })
-  @ApiResponse({ status: 200, description: 'Appointment found and returned.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment found and returned.',
+    type: AppointmentResponseDto,
+  })
   @ApiResponse({
     status: 401,
     description: 'Missing or invalid Authorization token.',
@@ -239,11 +259,16 @@ export class AppointmentController {
     @Param('id') id: string,
     @Headers('x-user-id') userId: string,
     @Headers('x-user-role') role: string,
-  ) {
+  ): Promise<AppointmentResponseDto> {
     if (!userId || !role) {
       throw new BadRequestException('Missing x-user-id or x-user-role headers');
     }
-    return this.getAppointmentByIdUseCase.execute(id, userId, role as UserRole);
+    const appointment = await this.getAppointmentByIdUseCase.execute(
+      id,
+      userId,
+      role as UserRole,
+    );
+    return toAppointmentResponse(appointment, role);
   }
 
   // -------------------------------------------------------------------------
@@ -296,6 +321,7 @@ export class AppointmentController {
   @ApiResponse({
     status: 200,
     description: 'Appointment updated successfully.',
+    type: AppointmentResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -319,16 +345,17 @@ export class AppointmentController {
     @Body() dto: UpdateAppointmentDto,
     @Headers('x-user-id') userId: string,
     @Headers('x-user-role') role: string,
-  ) {
+  ): Promise<AppointmentResponseDto> {
     if (!userId || !role) {
       throw new BadRequestException('Missing x-user-id or x-user-role headers');
     }
-    return this.updateAppointmentUseCase.execute(
+    const appointment = await this.updateAppointmentUseCase.execute(
       id,
       dto,
       userId,
       role as UserRole,
     );
+    return toAppointmentResponse(appointment, role);
   }
 
   // -------------------------------------------------------------------------
@@ -339,7 +366,8 @@ export class AppointmentController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Internal System Webhook - Process Payment Result',
-    description: 'Internal endpoint for Payment Service to report checkout completion.',
+    description:
+      'Internal endpoint for Payment Service to report checkout completion.',
   })
   async processPaymentWebhook(@Body() dto: PaymentWebhookDto) {
     return this.processPaymentWebhookUseCase.execute(dto);
