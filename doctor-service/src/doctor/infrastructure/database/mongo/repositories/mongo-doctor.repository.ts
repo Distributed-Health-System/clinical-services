@@ -28,6 +28,8 @@ export class MongoDoctorRepository implements IDoctorRepository {
     entity.licenseNumber = doc.licenseNumber;
     entity.yearsOfExperience = doc.yearsOfExperience;
     entity.bio = doc.bio;
+    entity.profileImageUrl = doc.profileImageUrl;
+    entity.profileImageBlobKey = doc.profileImageBlobKey;
     entity.isAvailable = doc.isAvailable;
     entity.isApproved = doc.isApproved;
     entity.createdAt = doc.createdAt;

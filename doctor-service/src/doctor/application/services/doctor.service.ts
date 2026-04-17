@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import type { IDoctorRepository } from '../../domain/repositories/doctor.repository.interface';
 import { DOCTOR_REPOSITORY } from '../../domain/repositories/doctor.repository.interface';
 import { DoctorEntity } from '../../domain/entities/doctor.entity';
@@ -12,6 +13,11 @@ import { DoctorNotFoundException } from '../../domain/exceptions/doctor-not-foun
 import { CreateDoctorDto } from '../dtos/create-doctor.dto';
 import { UpdateDoctorDto } from '../dtos/update-doctor.dto';
 import { KeycloakAdminService } from '../../infrastructure/keycloak/keycloak-admin.service';
+import {
+  CreateDoctorProfileImageUploadIntentDto,
+  FinalizeDoctorProfileImageUploadDto,
+} from '../dtos/doctor-profile-image.dto';
+import { FirebaseStorageService } from './firebase-storage.service';
 
 @Injectable()
 export class DoctorService {
@@ -21,6 +27,7 @@ export class DoctorService {
     @Inject(DOCTOR_REPOSITORY)
     private readonly doctorRepository: IDoctorRepository,
     private readonly keycloakAdminService: KeycloakAdminService,
+    private readonly firebaseStorage: FirebaseStorageService,
   ) {}
 
   findAll(specialization?: string): Promise<DoctorEntity[]> {
@@ -148,5 +155,78 @@ export class DoctorService {
     }
     if (!doctor) throw new DoctorNotFoundException(doctorRef);
     return doctor;
+  }
+
+  async getMyProfile(userId: string): Promise<DoctorEntity> {
+    return this.requireDoctorByUserId(userId);
+  }
+
+  async createMyProfileImageUploadIntent(
+    userId: string,
+    dto: CreateDoctorProfileImageUploadIntentDto,
+  ): Promise<{
+    blobKey: string;
+    uploadUrl: string;
+    expiresAt: string;
+    requiredHeaders: { 'Content-Type': string };
+  }> {
+    const doctor = await this.requireDoctorByUserId(userId);
+    const imageId = randomUUID();
+    const safeFilename = dto.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const blobKey = `doctors/${doctor.id}/profile-image/${imageId}/${safeFilename}`;
+    const signed = await this.firebaseStorage.createUploadUrl(blobKey, dto.mimeType);
+
+    return {
+      blobKey,
+      uploadUrl: signed.uploadUrl,
+      expiresAt: signed.expiresAt,
+      requiredHeaders: {
+        'Content-Type': dto.mimeType,
+      },
+    };
+  }
+
+  async finalizeMyProfileImageUpload(
+    userId: string,
+    dto: FinalizeDoctorProfileImageUploadDto,
+  ): Promise<DoctorEntity> {
+    const doctor = await this.requireDoctorByUserId(userId);
+    await this.firebaseStorage.ensureBlobExists(dto.blobKey);
+
+    if (doctor.profileImageBlobKey && doctor.profileImageBlobKey !== dto.blobKey) {
+      await this.firebaseStorage.deleteBlobIfExists(doctor.profileImageBlobKey);
+    }
+
+    const updated = await this.doctorRepository.update(doctor.id, {
+      profileImageBlobKey: dto.blobKey,
+      profileImageUrl: this.firebaseStorage.makeInternalFileUrl(dto.blobKey),
+    });
+    if (!updated) throw new DoctorNotFoundException(doctor.id);
+    return updated;
+  }
+
+  async getMyProfileImageDownloadUrl(
+    userId: string,
+  ): Promise<{ downloadUrl: string; expiresAt: string }> {
+    const doctor = await this.requireDoctorByUserId(userId);
+    if (!doctor.profileImageBlobKey) {
+      throw new NotFoundException('Doctor profile image not found.');
+    }
+    return this.firebaseStorage.createDownloadUrl(doctor.profileImageBlobKey);
+  }
+
+  async deleteMyProfileImage(userId: string): Promise<DoctorEntity> {
+    const doctor = await this.requireDoctorByUserId(userId);
+    if (!doctor.profileImageBlobKey) {
+      return doctor;
+    }
+
+    await this.firebaseStorage.deleteBlobIfExists(doctor.profileImageBlobKey);
+    const updated = await this.doctorRepository.update(doctor.id, {
+      profileImageBlobKey: '',
+      profileImageUrl: '',
+    });
+    if (!updated) throw new DoctorNotFoundException(doctor.id);
+    return updated;
   }
 }
