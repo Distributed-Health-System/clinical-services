@@ -9,6 +9,8 @@ export class DoctorEntity {
   licenseNumber!: string;
   yearsOfExperience!: number;
   bio!: string;
+  profileImageUrl!: string;
+  profileImageBlobKey!: string;
   isAvailable!: boolean;
   isApproved!: boolean;
   createdAt!: Date;

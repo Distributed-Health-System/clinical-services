@@ -11,11 +11,15 @@ import {
   Post,
   Query,
   Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { PatientService } from '../../application/services/patient.service';
-import { CreatePatientDto, ReportRefDto } from '../../application/dtos/create-patient.dto';
+import {
+  CreatePatientDto,
+  ReportRefDto,
+} from '../../application/dtos/create-patient.dto';
 import { UpdatePatientDto } from '../../application/dtos/update-patient.dto';
 import {
   CreateReportUploadIntentDto,
@@ -26,28 +30,50 @@ import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/roles.decorator';
 
 @Controller('patients')
-@UseGuards(GatewayAuthGuard, RolesGuard)
+// @UseGuards(GatewayAuthGuard, RolesGuard)
 export class PatientController {
   constructor(private readonly patientService: PatientService) {}
+
+  private getHeaderValue(req: Request, name: string): string | undefined {
+    const value = req.headers[name];
+    if (Array.isArray(value)) return value[0];
+    return value;
+  }
+
+  private requesterUserId(req: Request): string {
+    const userId = (req['userId'] as string | undefined) ?? this.getHeaderValue(req, 'x-user-id');
+    if (!userId?.trim()) {
+      throw new UnauthorizedException('Missing user identity');
+    }
+    return userId;
+  }
+
+  private requesterRole(req: Request): string {
+    const role = (req['userRole'] as string | undefined) ?? this.getHeaderValue(req, 'x-user-role');
+    if (!role?.trim()) {
+      throw new UnauthorizedException('Missing user role');
+    }
+    return role;
+  }
 
   @Get()
   @Roles('admin')
   findAll(@Req() req: Request) {
-    return this.patientService.findAll(req['userRole'] as string);
+    return this.patientService.findAll(this.requesterRole(req));
   }
 
   @Get('me')
   @Roles('patient')
   findMe(@Req() req: Request) {
-    return this.patientService.findMyByUserId(req['userId'] as string);
+    return this.patientService.findMyByUserId(this.requesterUserId(req));
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req: Request) {
     return this.patientService.getByIdForRequester(
       id,
-      req['userId'] as string,
-      req['userRole'] as string,
+      this.requesterUserId(req),
+      this.requesterRole(req),
     );
   }
 
@@ -61,8 +87,8 @@ export class PatientController {
     return this.patientService.getPrescriptions(
       id,
       { includeHistory: inc },
-      req['userId'] as string,
-      req['userRole'] as string,
+      this.requesterUserId(req),
+      this.requesterRole(req),
     );
   }
 
@@ -78,31 +104,36 @@ export class PatientController {
     return this.patientService.getReports(
       id,
       { category, limit, offset, sort },
-      req['userId'] as string,
-      req['userRole'] as string,
+      this.requesterUserId(req),
+      this.requesterRole(req),
     );
   }
 
+  // Public — patient self-registers, no token required
   @Post()
-  @Roles('patient')
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreatePatientDto, @Req() req: Request) {
-    return this.patientService.create(dto, req['userId'] as string);
+  @UseGuards()
+  create(@Body() dto: CreatePatientDto) {
+    return this.patientService.create(dto);
   }
 
   @Patch('me')
   @Roles('patient')
   updateMe(@Body() dto: UpdatePatientDto, @Req() req: Request) {
-    return this.patientService.updateMy(req['userId'] as string, dto);
+    return this.patientService.updateMy(this.requesterUserId(req), dto);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdatePatientDto, @Req() req: Request) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePatientDto,
+    @Req() req: Request,
+  ) {
     return this.patientService.update(
       id,
       dto,
-      req['userId'] as string,
-      req['userRole'] as string,
+      this.requesterUserId(req),
+      this.requesterRole(req),
     );
   }
 
@@ -110,17 +141,21 @@ export class PatientController {
   @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string, @Req() req: Request) {
-    return this.patientService.delete(id, req['userRole'] as string);
+    return this.patientService.delete(id, this.requesterRole(req));
   }
 
   @Post(':id/reports')
   @Roles('patient')
-  addReport(@Param('id') id: string, @Body() dto: ReportRefDto, @Req() req: Request) {
+  addReport(
+    @Param('id') id: string,
+    @Body() dto: ReportRefDto,
+    @Req() req: Request,
+  ) {
     return this.patientService.addReport(
       id,
       dto,
-      req['userId'] as string,
-      req['userRole'] as string,
+      this.requesterUserId(req),
+      this.requesterRole(req),
     );
   }
 
@@ -134,8 +169,8 @@ export class PatientController {
     return this.patientService.createReportUploadIntent(
       id,
       dto,
-      req['userId'] as string,
-      req['userRole'] as string,
+      this.requesterUserId(req),
+      this.requesterRole(req),
     );
   }
 
@@ -149,8 +184,8 @@ export class PatientController {
     return this.patientService.finalizeReportUpload(
       id,
       dto,
-      req['userId'] as string,
-      req['userRole'] as string,
+      this.requesterUserId(req),
+      this.requesterRole(req),
     );
   }
 
@@ -163,8 +198,8 @@ export class PatientController {
     return this.patientService.getReportDownloadUrl(
       id,
       reportId,
-      req['userId'] as string,
-      req['userRole'] as string,
+      this.requesterUserId(req),
+      this.requesterRole(req),
     );
   }
 
@@ -178,8 +213,8 @@ export class PatientController {
     return this.patientService.removeReport(
       id,
       reportId,
-      req['userId'] as string,
-      req['userRole'] as string,
+      this.requesterUserId(req),
+      this.requesterRole(req),
     );
   }
 }

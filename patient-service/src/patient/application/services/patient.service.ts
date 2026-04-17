@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import type { IPatientRepository } from '../../domain/repositories/patient.repository.interface';
 import { PATIENT_REPOSITORY } from '../../domain/repositories/patient.repository.interface';
@@ -11,6 +12,7 @@ import { PatientNotFoundException } from '../../domain/exceptions/patient-not-fo
 import { CreatePatientDto, ReportRefDto } from '../dtos/create-patient.dto';
 import { UpdatePatientDto } from '../dtos/update-patient.dto';
 import { PrescriptionProxyService } from './prescription-proxy.service';
+import { KeycloakAdminService } from '../../infrastructure/keycloak/keycloak-admin.service';
 import {
   CreateReportUploadIntentDto,
   FinalizeReportUploadDto,
@@ -20,11 +22,14 @@ import { randomUUID } from 'crypto';
 
 @Injectable()
 export class PatientService {
+  private readonly logger = new Logger(PatientService.name);
+
   constructor(
     @Inject(PATIENT_REPOSITORY)
     private readonly patientRepository: IPatientRepository,
     private readonly prescriptionProxy: PrescriptionProxyService,
     private readonly firebaseStorage: FirebaseStorageService,
+    private readonly keycloakAdminService: KeycloakAdminService,
   ) {}
 
   private toDuplicateEmailConflict(error: unknown): never {
@@ -78,18 +83,25 @@ export class PatientService {
     return patient;
   }
 
-  async create(dto: CreatePatientDto, userId: string): Promise<PatientEntity> {
-    const existing = await this.patientRepository.findByUserId(userId);
-    if (existing) {
-      throw new ConflictException('Patient profile already exists for this user.');
-    }
+  async create(dto: CreatePatientDto): Promise<PatientEntity> {
+    const { password, ...profile } = dto;
+
+    const userId = await this.keycloakAdminService.createPatientUser(
+      dto.firstName,
+      dto.lastName,
+      dto.email,
+      password,
+    );
+
     try {
       return await this.patientRepository.create({
-        ...dto,
+        ...profile,
         userId,
         dateOfBirth: new Date(dto.dateOfBirth),
       });
     } catch (error) {
+      this.logger.error(`DB save failed after Keycloak user created (${userId}), rolling back`);
+      await this.keycloakAdminService.deleteUser(userId);
       this.toDuplicateEmailConflict(error);
     }
   }
