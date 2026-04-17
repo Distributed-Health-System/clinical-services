@@ -12,9 +12,14 @@ export class GatewayAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const userId = request.headers['x-user-id'];
     const userRole = request.headers['x-user-role'];
-
+    console.log(
+      'Gateway Authentication Headers: coming to  doctor',
+      request.headers,
+    );
     if (!userId || !userRole) {
-      throw new UnauthorizedException('Missing identity headers');
+      throw new UnauthorizedException(
+        'Missing identity headers (x-user-id, x-user-role) for gateway authentication.',
+      );
     }
 
     request['userId'] = userId as string;
