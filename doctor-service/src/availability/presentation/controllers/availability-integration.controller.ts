@@ -9,7 +9,6 @@ import { ServiceOrGatewayAuthGuard } from '../../../common/guards/service-or-gat
  * Mounted under `/doctors/...` so the API gateway’s `/doctors` proxy forwards them.
  */
 @Controller('doctors/integration/availability')
-@UseGuards(ServiceOrGatewayAuthGuard)
 export class AvailabilityIntegrationController {
   constructor(private readonly availabilityService: AvailabilityService) {}
 
@@ -27,6 +26,7 @@ export class AvailabilityIntegrationController {
   }
 
   @Post('validate-slot')
+  @UseGuards(ServiceOrGatewayAuthGuard)
   validateSlot(@Body() dto: ValidateSlotDto) {
     return this.availabilityService.validateSlot(dto.doctorUserId, dto.slotStart);
   }
