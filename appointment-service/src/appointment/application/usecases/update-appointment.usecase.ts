@@ -6,6 +6,7 @@ import { AppointmentStatus } from '../../domain/enums/appointment-status.enum';
 import { UserRole } from '../../domain/enums/user-role.enum';
 import { SLOT_DURATION_MINUTES } from '../../domain/constants/appointment.constants';
 import { DoctorClient } from '../../infrastructure/external/doctor.client';
+import { PaymentClient } from '../../infrastructure/external/payment.client';
 import { AppointmentValidationService } from '../services/appointment-validation.service';
 import { UpdateAppointmentDto } from '../dtos/update-appointment.dto';
 
@@ -18,6 +19,7 @@ export class UpdateAppointmentUseCase {
     private readonly appointmentRepository: IAppointmentRepository,
     private readonly doctorClient: DoctorClient,
     private readonly validationService: AppointmentValidationService,
+    private readonly paymentClient: PaymentClient,
   ) {}
 
   async execute(
@@ -69,11 +71,23 @@ export class UpdateAppointmentUseCase {
       );
 
       partial.slotStart = newSlotStart;
-      partial.status = AppointmentStatus.PENDING;
-      // Rescheduling requires re-confirmation (payment/auto) or manual,
-      // so we clear existing links.
-      partial.telemedicineLinkDoctor = undefined;
-      partial.telemedicineLinkPatient = undefined;
+      
+      // Rescheduling checks payment status again via synchronous call to Payment Service
+      try {
+        const paymentStatus = await this.paymentClient.confirmPayment(id);
+        if (paymentStatus === 'CONFIRMED') {
+          partial.status = AppointmentStatus.CONFIRMED;
+          partial.paymentStatus = 'CONFIRMED';
+        } else {
+          partial.status = AppointmentStatus.PENDING;
+          partial.paymentStatus = paymentStatus;
+        }
+      } catch (error) {
+        this.logger.warn(`Payment confirmation failed during reschedule for appointment ${id}: ${error.message}`);
+        partial.status = AppointmentStatus.PENDING;
+        partial.paymentStatus = 'PENDING';
+      }
+      // Telemedicine links are intentionally preserved since they are tied to appointmentId, patientId, and doctorId.
     }
 
     if (Object.keys(partial).length === 0) {
