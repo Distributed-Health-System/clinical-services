@@ -32,6 +32,12 @@ export class DoctorSchemaClass {
   @Prop({ default: '' })
   bio!: string;
 
+  @Prop({ default: '' })
+  profileImageUrl!: string;
+
+  @Prop({ default: '' })
+  profileImageBlobKey!: string;
+
   @Prop({ default: true })
   isAvailable!: boolean;
 
