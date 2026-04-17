@@ -24,9 +24,12 @@ export class DoctorService {
   ) {}
 
   findAll(specialization?: string): Promise<DoctorEntity[]> {
-    return this.doctorRepository.findAll(true, {
-      specialization: specialization?.trim() || undefined,
-    });
+    const trimmed = specialization?.trim();
+    console.log('Finding doctors with specialization filter:', trimmed);
+    return this.doctorRepository.findAll(
+      true,
+      trimmed ? { specialization: trimmed } : undefined,
+    );
   }
 
   async findById(
@@ -60,9 +63,15 @@ export class DoctorService {
     );
 
     try {
-      return await this.doctorRepository.create({ ...profile, userId, isApproved: false });
+      return await this.doctorRepository.create({
+        ...profile,
+        userId,
+        isApproved: false,
+      });
     } catch (err) {
-      this.logger.error(`DB save failed after Keycloak user created (${userId}), rolling back`);
+      this.logger.error(
+        `DB save failed after Keycloak user created (${userId}), rolling back`,
+      );
       await this.keycloakAdminService.deleteUser(userId);
       throw err;
     }

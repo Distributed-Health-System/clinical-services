@@ -21,11 +21,17 @@ import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/roles.decorator';
 
 @Controller('doctors')
-@UseGuards(GatewayAuthGuard, RolesGuard)
 export class DoctorController {
   constructor(private readonly doctorService: DoctorService) {}
 
-  // Any authenticated user — patients browse approved doctors
+  // Public — doctor self-registers, no token required
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  create(@Body() dto: CreateDoctorDto) {
+    return this.doctorService.create(dto);
+  }
+
+  // Public — anyone can browse the approved doctor list
   @Get()
   findAll(@Query('specialization') specialization?: string) {
     return this.doctorService.findAll(specialization);
@@ -33,20 +39,14 @@ export class DoctorController {
 
   // Any authenticated user — unapproved profiles hidden unless own or admin
   @Get(':id')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
   findOne(@Param('id') id: string, @Req() req: Request) {
     return this.doctorService.findById(id, req['userId'], req['userRole']);
   }
 
-  // Public — doctor self-registers, no token required
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  @UseGuards()
-  create(@Body() dto: CreateDoctorDto) {
-    return this.doctorService.create(dto);
-  }
-
   // Doctor edits own profile, or admin edits any
   @Patch(':id')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateDoctorDto,
@@ -57,6 +57,7 @@ export class DoctorController {
 
   // Admin approves a doctor registration
   @Patch(':id/approve')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
   @Roles('admin')
   approve(@Param('id') id: string) {
     return this.doctorService.approve(id);
@@ -64,6 +65,7 @@ export class DoctorController {
 
   // Admin rejects a doctor registration — deletes the record
   @Patch(':id/reject')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
   @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   reject(@Param('id') id: string) {
@@ -72,6 +74,7 @@ export class DoctorController {
 
   // Admin only
   @Delete(':id')
+  @UseGuards(GatewayAuthGuard, RolesGuard)
   @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {
