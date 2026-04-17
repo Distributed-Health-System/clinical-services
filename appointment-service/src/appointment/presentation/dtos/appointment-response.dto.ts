@@ -38,7 +38,8 @@ export class AppointmentResponseDto {
   reasonForVisit: string;
 
   @ApiProperty({
-    description: "Payment status from payment workflow: 'PENDING' | 'CONFIRMED' | 'FAILED'.",
+    description:
+      "Payment status from payment workflow: 'PENDING' | 'CONFIRMED' | 'FAILED'.",
     example: 'CONFIRMED',
   })
   paymentStatus: string;
@@ -50,13 +51,15 @@ export class AppointmentResponseDto {
   paymentTransactionId?: string;
 
   @ApiPropertyOptional({
-    description: 'Doctor telemedicine join URL (only returned to doctor/admin).',
+    description:
+      'Doctor telemedicine join URL (only returned to doctor/admin).',
     example: 'https://meet.jit.si/telemed-abc-host',
   })
   telemedicineLinkDoctor?: string;
 
   @ApiPropertyOptional({
-    description: 'Patient telemedicine join URL (only returned to patient/admin).',
+    description:
+      'Patient telemedicine join URL (only returned to patient/admin).',
     example: 'https://meet.jit.si/telemed-abc-guest',
   })
   telemedicineLinkPatient?: string;

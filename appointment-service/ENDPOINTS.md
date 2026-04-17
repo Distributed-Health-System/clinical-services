@@ -2,11 +2,11 @@
 
 Replace host/port if your `.env` differs. Defaults used below:
 
-| Call style                        | Base URL                          | Full path rule         |
-| --------------------------------- | --------------------------------- | ---------------------- |
-| **Direct to appointment-service** | `http://localhost:3004`           | `{BASE_DIRECT}{path}`  |
+| Call style                        | Base URL                                 | Full path rule         |
+| --------------------------------- | ---------------------------------------- | ---------------------- |
+| **Direct to appointment-service** | `http://localhost:3004`                  | `{BASE_DIRECT}{path}`  |
 | **Through API gateway**           | `http://localhost:3001/api/appointments` | `{BASE_GATEWAY}{path}` |
-| **Kubernetes Internal DNS**       | `http://appointment-service:3004` | `{BASE_K8S}{path}`     |
+| **Kubernetes Internal DNS**       | `http://appointment-service:3004`        | `{BASE_K8S}{path}`     |
 
 Paths are identical for all; only the host (and gateway port/structure) changes. Gateway forwards anything under `/api/appointments` to appointment-service natively.
 
