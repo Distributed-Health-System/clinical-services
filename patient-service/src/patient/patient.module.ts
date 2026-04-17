@@ -12,6 +12,8 @@ import { PrescriptionProxyService } from './application/services/prescription-pr
 import { GatewayAuthGuard } from './presentation/guards/gateway-auth.guard';
 import { RolesGuard } from './presentation/guards/roles.guard';
 import { Reflector } from '@nestjs/core';
+import { FirebaseStorageService } from './application/services/firebase-storage.service';
+import { KeycloakAdminService } from './infrastructure/keycloak/keycloak-admin.service';
 
 /**
  * Module definition for Patient.
@@ -25,7 +27,9 @@ import { Reflector } from '@nestjs/core';
   controllers: [PatientController],
   providers: [
     PatientService,
+    KeycloakAdminService,
     PrescriptionProxyService,
+    FirebaseStorageService,
     GatewayAuthGuard,
     RolesGuard,
     Reflector,

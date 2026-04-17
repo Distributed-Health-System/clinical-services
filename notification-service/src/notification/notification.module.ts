@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 // import { MongoNotificationRepository } from './infrastructure/database/mongo/repositories/mongo-notification.repository';
 import { NotificationService } from './application/services/notification.service';
 import { NotificationController } from './presentation/controllers/notification.controller';
+import { ServiceOrGatewayAuthGuard } from '../common/guards/service-or-gateway-auth.guard';
 
 /**
  * Module definition for Notification.
@@ -15,6 +16,7 @@ import { NotificationController } from './presentation/controllers/notification.
   controllers: [NotificationController],
   providers: [
     NotificationService,
+    ServiceOrGatewayAuthGuard,
     // MongoNotificationRepository,
   ],
 })

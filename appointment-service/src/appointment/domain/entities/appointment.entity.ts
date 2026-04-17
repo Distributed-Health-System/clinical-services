@@ -73,12 +73,16 @@ export class Appointment {
   reasonForVisit: string;
 
   /**
-   * A URL for the telemedicine video session.
-   * Populated by the Application Service after calling the Telemedicine Service
-   * when the appointment transitions to CONFIRMED.
-   * Undefined for PENDING, REJECTED, and CANCELLED appointments.
+   * The URL for the doctor to join the telemedicine video session.
+   * Populated automatically when the appointment transitions to CONFIRMED.
    */
-  telemedicineLink?: string;
+  telemedicineLinkDoctor?: string;
+
+  /**
+   * The URL for the patient to join the telemedicine video session.
+   * Populated automatically when the appointment transitions to CONFIRMED.
+   */
+  telemedicineLinkPatient?: string;
 
   /**
    * The payment status for this appointment.
@@ -91,4 +95,10 @@ export class Appointment {
    *   'FAILED'    — payment was unsuccessful
    */
   paymentStatus: string;
+
+  /**
+   * The transaction ID provided by the Payment Service indicating proof of payment.
+   * Populated asynchronously via webhook.
+   */
+  paymentTransactionId?: string;
 }

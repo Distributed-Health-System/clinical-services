@@ -24,7 +24,7 @@ import { v4 as uuidv4 } from 'uuid';
  *
  * Expected Telemedicine Service contract (POST /sessions):
  *   Request body:  { appointmentId: string }
- *   Response body: { sessionUrl: string }
+ *   Response body: { doctorLink: string, patientLink: string }
  */
 @Injectable()
 export class TelemedicineClient {
@@ -37,9 +37,9 @@ export class TelemedicineClient {
    * Always returns a usable URL — falls back to a mock Jitsi URL on any failure.
    *
    * @param appointmentId - The confirmed appointment's ID (used as the session key).
-   * @returns A telemedicine session URL string.
+   * @returns An object containing `doctorLink` and `patientLink`.
    */
-  async generateLink(appointmentId: string): Promise<string> {
+  async generateLink(appointmentId: string): Promise<{ doctorLink: string; patientLink: string }> {
     const baseUrl = process.env.TELEMEDICINE_SERVICE_URL;
 
     // If the env var is not configured, return a mock URL immediately.
@@ -65,16 +65,16 @@ export class TelemedicineClient {
         return this._mockUrl(appointmentId);
       }
 
-      const data = (await response.json()) as { sessionUrl: string };
+      const data = (await response.json()) as { doctorLink: string; patientLink: string };
 
-      if (!data?.sessionUrl) {
+      if (!data?.doctorLink || !data?.patientLink) {
         this.logger.error(
-          `Telemedicine Service response missing sessionUrl for appointment ${appointmentId}. Falling back.`,
+          `Telemedicine Service response missing links for appointment ${appointmentId}. Falling back.`,
         );
         return this._mockUrl(appointmentId);
       }
 
-      return data.sessionUrl;
+      return data;
     } catch (error) {
       // Network error, timeout, DNS failure, etc.
       this.logger.error(
@@ -88,13 +88,15 @@ export class TelemedicineClient {
    * Generates a deterministic-looking mock Jitsi URL.
    * Used as a fallback when the Telemedicine Service is unavailable.
    *
-   * Format: https://meet.jit.si/telemed-<uuid>
-   * The UUID is generated fresh each call (not tied to appointmentId) to
-   * ensure uniqueness even across retries.
+   * Format: doctor: https://meet.jit.si/telemed-<uuid>-host
+   *         patient: https://meet.jit.si/telemed-<uuid>-guest
    */
-  private _mockUrl(appointmentId: string): string {
-    // appointmentId is logged for traceability but not embedded in the URL
-    this.logger.debug(`Generating mock telemedicine URL for ${appointmentId}`);
-    return `https://meet.jit.si/telemed-${uuidv4()}`;
+  private _mockUrl(appointmentId: string): { doctorLink: string; patientLink: string } {
+    this.logger.debug(`Generating mock telemedicine links for ${appointmentId}`);
+    const sessionId = uuidv4();
+    return {
+      doctorLink: `https://meet.jit.si/telemed-${sessionId}-host`,
+      patientLink: `https://meet.jit.si/telemed-${sessionId}-guest`,
+    };
   }
 }

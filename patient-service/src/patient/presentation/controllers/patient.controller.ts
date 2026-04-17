@@ -15,14 +15,21 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { PatientService } from '../../application/services/patient.service';
-import { CreatePatientDto, ReportRefDto } from '../../application/dtos/create-patient.dto';
+import {
+  CreatePatientDto,
+  ReportRefDto,
+} from '../../application/dtos/create-patient.dto';
 import { UpdatePatientDto } from '../../application/dtos/update-patient.dto';
+import {
+  CreateReportUploadIntentDto,
+  FinalizeReportUploadDto,
+} from '../../application/dtos/report-upload.dto';
 import { GatewayAuthGuard } from '../guards/gateway-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/roles.decorator';
 
 @Controller('patients')
-@UseGuards(GatewayAuthGuard, RolesGuard)
+// @UseGuards(GatewayAuthGuard, RolesGuard)
 export class PatientController {
   constructor(private readonly patientService: PatientService) {}
 
@@ -79,11 +86,12 @@ export class PatientController {
     );
   }
 
+  // Public — patient self-registers, no token required
   @Post()
-  @Roles('patient')
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreatePatientDto, @Req() req: Request) {
-    return this.patientService.create(dto, req['userId'] as string);
+  @UseGuards()
+  create(@Body() dto: CreatePatientDto) {
+    return this.patientService.create(dto);
   }
 
   @Patch('me')
@@ -93,7 +101,11 @@ export class PatientController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdatePatientDto, @Req() req: Request) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePatientDto,
+    @Req() req: Request,
+  ) {
     return this.patientService.update(
       id,
       dto,
@@ -111,10 +123,58 @@ export class PatientController {
 
   @Post(':id/reports')
   @Roles('patient')
-  addReport(@Param('id') id: string, @Body() dto: ReportRefDto, @Req() req: Request) {
+  addReport(
+    @Param('id') id: string,
+    @Body() dto: ReportRefDto,
+    @Req() req: Request,
+  ) {
     return this.patientService.addReport(
       id,
       dto,
+      req['userId'] as string,
+      req['userRole'] as string,
+    );
+  }
+
+  @Post(':id/reports/upload-intent')
+  @Roles('patient')
+  createReportUploadIntent(
+    @Param('id') id: string,
+    @Body() dto: CreateReportUploadIntentDto,
+    @Req() req: Request,
+  ) {
+    return this.patientService.createReportUploadIntent(
+      id,
+      dto,
+      req['userId'] as string,
+      req['userRole'] as string,
+    );
+  }
+
+  @Post(':id/reports/finalize')
+  @Roles('patient')
+  finalizeReportUpload(
+    @Param('id') id: string,
+    @Body() dto: FinalizeReportUploadDto,
+    @Req() req: Request,
+  ) {
+    return this.patientService.finalizeReportUpload(
+      id,
+      dto,
+      req['userId'] as string,
+      req['userRole'] as string,
+    );
+  }
+
+  @Get(':id/reports/:reportId/download-url')
+  getReportDownloadUrl(
+    @Param('id') id: string,
+    @Param('reportId') reportId: string,
+    @Req() req: Request,
+  ) {
+    return this.patientService.getReportDownloadUrl(
+      id,
+      reportId,
       req['userId'] as string,
       req['userRole'] as string,
     );

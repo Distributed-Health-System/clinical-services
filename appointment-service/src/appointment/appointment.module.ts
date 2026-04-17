@@ -18,11 +18,19 @@ import { DoctorClient } from './infrastructure/external/doctor.client';
 // --- Domain: DI Token ---
 import { APPOINTMENT_REPOSITORY } from './domain/repositories/appointment.repository.interface';
 
-// --- Application: Service ---
-import { AppointmentService } from './application/services/appointment.service';
+// --- Application: UseCases ---
+import { BookAppointmentUseCase } from './application/usecases/book-appointment.usecase';
+import { GetAppointmentsUseCase } from './application/usecases/get-appointments.usecase';
+import { GetAvailableSlotsUseCase } from './application/usecases/get-available-slots.usecase';
+import { GetAppointmentByIdUseCase } from './application/usecases/get-appointment-by-id.usecase';
+import { UpdateAppointmentStatusUseCase } from './application/usecases/update-appointment-status.usecase';
+import { UpdateAppointmentUseCase } from './application/usecases/update-appointment.usecase';
+import { ProcessPaymentWebhookUseCase } from './application/usecases/process-payment-webhook.usecase';
+import { AppointmentValidationService } from './application/services/appointment-validation.service';
+
 
 // --- Presentation: Guard + Controller ---
-import { AuthGuard } from './presentation/guards/auth.guard';
+
 import { AppointmentController } from './presentation/controllers/appointment.controller';
 
 /**
@@ -37,13 +45,6 @@ import { AppointmentController } from './presentation/controllers/appointment.co
  *     provide:  APPOINTMENT_REPOSITORY (string constant from domain)
  *     useClass: MongoAppointmentRepository (infrastructure impl)
  *
- *   This means the AppointmentService receives the interface contract
- *   and remains completely decoupled from Mongoose — swapping the
- *   implementation (e.g., to Postgres) requires only changing this module.
- *
- * Guard Registration:
- *   AuthGuard is registered as a provider so NestJS can resolve it
- *   when @UseGuards(AuthGuard) is applied to the controller.
  */
 @Module({
   imports: [
@@ -55,7 +56,14 @@ import { AppointmentController } from './presentation/controllers/appointment.co
   controllers: [AppointmentController],
   providers: [
     // --- Application Layer ---
-    AppointmentService,
+    BookAppointmentUseCase,
+    GetAppointmentsUseCase,
+    GetAvailableSlotsUseCase,
+    GetAppointmentByIdUseCase,
+    UpdateAppointmentStatusUseCase,
+    UpdateAppointmentUseCase,
+    ProcessPaymentWebhookUseCase,
+    AppointmentValidationService,
 
     // --- Infrastructure: Repository (bound to domain interface token) ---
     {
@@ -68,8 +76,7 @@ import { AppointmentController } from './presentation/controllers/appointment.co
     PaymentClient,
     DoctorClient,
 
-    // --- Presentation: Guard ---
-    AuthGuard,
+
   ],
 })
 export class AppointmentModule {}

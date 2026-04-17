@@ -74,12 +74,14 @@ export class Appointment {
   reasonForVisit: string;
 
   /**
-   * Telemedicine session URL.
-   * Optional — populated only when the appointment is CONFIRMED and the
-   * Telemedicine Service has successfully returned a session link.
+   * Telemedicine session URLs.
+   * Optional — populated only when the appointment is CONFIRMED.
    */
   @Prop({ required: false, default: null })
-  telemedicineLink: string;
+  telemedicineLinkDoctor: string;
+
+  @Prop({ required: false, default: null })
+  telemedicineLinkPatient: string;
 
   /**
    * Payment status from the Payment Service.
@@ -88,6 +90,12 @@ export class Appointment {
    */
   @Prop({ required: true, default: 'PENDING' })
   paymentStatus: string;
+
+  /**
+   * The transaction ID provided by the Payment Service indicating proof of payment.
+   */
+  @Prop({ required: false, default: null })
+  paymentTransactionId: string;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);

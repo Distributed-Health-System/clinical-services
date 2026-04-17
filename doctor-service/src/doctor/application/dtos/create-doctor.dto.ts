@@ -22,6 +22,10 @@ export class CreateDoctorDto {
   email: string;
 
   @IsString()
+  @IsNotEmpty()
+  password: string;
+
+  @IsString()
   @IsOptional()
   phone?: string;
 

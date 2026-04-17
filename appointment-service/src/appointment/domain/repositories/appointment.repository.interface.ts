@@ -75,7 +75,8 @@ export interface IAppointmentRepository {
   updateStatus(
     id: string,
     status: AppointmentStatus,
-    telemedicineLink?: string,
+    telemedicineLinkDoctor?: string,
+    telemedicineLinkPatient?: string,
   ): Promise<Appointment | null>;
 
   // -------------------------------------------------------------------------

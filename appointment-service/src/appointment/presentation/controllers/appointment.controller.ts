@@ -9,8 +9,7 @@ import {
   Patch,
   Post,
   Query,
-  Req,
-  UseGuards,
+  Headers,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,12 +19,18 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { AppointmentService } from '../../application/services/appointment.service';
+import { BookAppointmentUseCase } from '../../application/usecases/book-appointment.usecase';
+import { GetAppointmentsUseCase } from '../../application/usecases/get-appointments.usecase';
+import { GetAvailableSlotsUseCase } from '../../application/usecases/get-available-slots.usecase';
+import { GetAppointmentByIdUseCase } from '../../application/usecases/get-appointment-by-id.usecase';
+import { UpdateAppointmentStatusUseCase } from '../../application/usecases/update-appointment-status.usecase';
+import { UpdateAppointmentUseCase } from '../../application/usecases/update-appointment.usecase';
+import { ProcessPaymentWebhookUseCase } from '../../application/usecases/process-payment-webhook.usecase';
 import { CreateAppointmentDto } from '../../application/dtos/create-appointment.dto';
 import { UpdateAppointmentStatusDto } from '../../application/dtos/update-appointment-status.dto';
 import { UpdateAppointmentDto } from '../../application/dtos/update-appointment.dto';
-import { AuthGuard } from '../guards/auth.guard';
-import type { AuthenticatedRequest } from '../guards/auth.guard';
+import { PaymentWebhookDto } from '../../application/dtos/payment-webhook.dto';
+import { UserRole } from '../../domain/enums/user-role.enum';
 import { AppointmentTimeFilter } from '../../domain/enums/appointment-time-filter.enum';
 
 /**
@@ -35,8 +40,8 @@ import { AppointmentTimeFilter } from '../../domain/enums/appointment-time-filte
  * All routes are guarded by AuthGuard (identity extraction + role parsing).
  *
  * Responsibility matrix:
- *   Controller  → extract request data, delegate to service, return response
- *   Service     → business logic, authorization (ownership + role checks)
+ *   Controller  → extract request data, delegate to usecase, return response
+ *   UseCase     → business logic, authorization (ownership + role checks)
  *   Repository  → persistence (never touched from here)
  *
  * Route ordering note:
@@ -50,10 +55,17 @@ import { AppointmentTimeFilter } from '../../domain/enums/appointment-time-filte
  */
 @ApiTags('appointments')
 @ApiBearerAuth()
-@UseGuards(AuthGuard)
 @Controller('appointments')
 export class AppointmentController {
-  constructor(private readonly appointmentService: AppointmentService) {}
+  constructor(
+    private readonly bookAppointmentUseCase: BookAppointmentUseCase,
+    private readonly getAppointmentsUseCase: GetAppointmentsUseCase,
+    private readonly getAvailableSlotsUseCase: GetAvailableSlotsUseCase,
+    private readonly getAppointmentByIdUseCase: GetAppointmentByIdUseCase,
+    private readonly updateAppointmentStatusUseCase: UpdateAppointmentStatusUseCase,
+    private readonly updateAppointmentUseCase: UpdateAppointmentUseCase,
+    private readonly processPaymentWebhookUseCase: ProcessPaymentWebhookUseCase,
+  ) {}
 
   // -------------------------------------------------------------------------
   // POST /appointments — Book an appointment (Patient only)
@@ -68,16 +80,32 @@ export class AppointmentController {
       'Validates slot alignment, doctor availability (conflict check), ' +
       'and patient double-booking.',
   })
-  @ApiResponse({ status: 201, description: 'Appointment successfully created.' })
-  @ApiResponse({ status: 400, description: 'Invalid slot time or field validation failure.' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Authorization token.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Appointment successfully created.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid slot time or field validation failure.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Authorization token.',
+  })
   @ApiResponse({ status: 403, description: 'Caller is not a PATIENT.' })
-  @ApiResponse({ status: 409, description: 'Slot conflict — doctor or patient is already booked.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Slot conflict — doctor or patient is already booked.',
+  })
   async bookAppointment(
     @Body() dto: CreateAppointmentDto,
-    @Req() req: AuthenticatedRequest,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-role') role: string,
   ) {
-    return this.appointmentService.bookAppointment(dto, req.user.userId, req.user.role);
+    if (!userId || !role) {
+      throw new BadRequestException('Missing x-user-id or x-user-role headers');
+    }
+    return this.bookAppointmentUseCase.execute(dto, userId, role as UserRole);
   }
 
   // -------------------------------------------------------------------------
@@ -101,19 +129,26 @@ export class AppointmentController {
     description: 'Temporal filter: PAST, CURRENT, or UPCOMING.',
   })
   @ApiResponse({ status: 200, description: 'List of appointments returned.' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Authorization token.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Authorization token.',
+  })
   async getAppointments(
-    @Req() req: AuthenticatedRequest,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-role') role: string,
     @Query('filter') timeFilter?: AppointmentTimeFilter,
   ) {
+    if (!userId || !role) {
+      throw new BadRequestException('Missing x-user-id or x-user-role headers');
+    }
     // Validate the filter query param if provided
     const validFilters = Object.values(AppointmentTimeFilter) as string[];
     const resolvedFilter =
       timeFilter && validFilters.includes(timeFilter) ? timeFilter : undefined;
 
-    return this.appointmentService.getAppointments(
-      req.user.userId,
-      req.user.role,
+    return this.getAppointmentsUseCase.execute(
+      userId,
+      role as UserRole,
       resolvedFilter,
     );
   }
@@ -130,20 +165,38 @@ export class AppointmentController {
     description:
       'Proxies to the Doctor Service availability integration endpoint. ' +
       'Returns UTC ISO 8601 slot start strings within the given time window, ' +
-      'filtered by the doctor\'s configured schedule (hours, breaks, overrides). ' +
+      "filtered by the doctor's configured schedule (hours, breaks, overrides). " +
       'Returns [] if the doctor has no schedule or the Doctor Service is unreachable. ' +
       'Maintains distribution transparency — frontend only talks to the Appointment Service.',
   })
   @ApiParam({ name: 'doctorId', description: "The doctor's auth user ID." })
-  @ApiQuery({ name: 'from', required: true, description: 'Window start — ISO 8601 UTC (e.g. 2026-04-20T00:00:00.000Z).' })
-  @ApiQuery({ name: 'to', required: true, description: 'Window end — ISO 8601 UTC (e.g. 2026-04-20T23:59:59.999Z).' })
+  @ApiQuery({
+    name: 'from',
+    required: true,
+    description: 'Window start — ISO 8601 UTC (e.g. 2026-04-20T00:00:00.000Z).',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: true,
+    description: 'Window end — ISO 8601 UTC (e.g. 2026-04-20T23:59:59.999Z).',
+  })
   @ApiResponse({
     status: 200,
     description: 'Array of available UTC slot start strings.',
-    schema: { example: { slots: ['2026-04-20T09:00:00.000Z', '2026-04-20T09:30:00.000Z'] } },
+    schema: {
+      example: {
+        slots: ['2026-04-20T09:00:00.000Z', '2026-04-20T09:30:00.000Z'],
+      },
+    },
   })
-  @ApiResponse({ status: 400, description: 'Missing or invalid from/to query params.' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Authorization token.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Missing or invalid from/to query params.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Authorization token.',
+  })
   async getAvailableSlots(
     @Param('doctorId') doctorId: string,
     @Query('from') from: string,
@@ -155,7 +208,7 @@ export class AppointmentController {
       );
     }
     return {
-      slots: await this.appointmentService.getAvailableSlots(doctorId, from, to),
+      slots: await this.getAvailableSlotsUseCase.execute(doctorId, from, to),
     };
   }
 
@@ -173,14 +226,24 @@ export class AppointmentController {
   })
   @ApiParam({ name: 'id', description: 'The appointment MongoDB ObjectId.' })
   @ApiResponse({ status: 200, description: 'Appointment found and returned.' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Authorization token.' })
-  @ApiResponse({ status: 403, description: 'Caller does not own this appointment.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Authorization token.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller does not own this appointment.',
+  })
   @ApiResponse({ status: 404, description: 'Appointment not found.' })
   async getAppointmentById(
     @Param('id') id: string,
-    @Req() req: AuthenticatedRequest,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-role') role: string,
   ) {
-    return this.appointmentService.getAppointmentById(id, req.user.userId, req.user.role);
+    if (!userId || !role) {
+      throw new BadRequestException('Missing x-user-id or x-user-role headers');
+    }
+    return this.getAppointmentByIdUseCase.execute(id, userId, role as UserRole);
   }
 
   // -------------------------------------------------------------------------
@@ -188,6 +251,7 @@ export class AppointmentController {
   // IMPORTANT: Declared BEFORE /:id to ensure specific route matches first.
   // -------------------------------------------------------------------------
 
+  /*
   @Patch(':id/status')
   @ApiOperation({
     summary: 'Accept or reject a PENDING appointment (Doctor only)',
@@ -205,10 +269,15 @@ export class AppointmentController {
   async updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateAppointmentStatusDto,
-    @Req() req: AuthenticatedRequest,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-role') role: string,
   ) {
-    return this.appointmentService.updateStatus(id, dto, req.user.userId, req.user.role);
+    if (!userId || !role) {
+      throw new BadRequestException('Missing x-user-id or x-user-role headers');
+    }
+    return this.updateAppointmentStatusUseCase.execute(id, dto, userId, role as UserRole);
   }
+  */
 
   // -------------------------------------------------------------------------
   // PATCH /appointments/:id — Modify or Cancel (Patient only)
@@ -224,22 +293,55 @@ export class AppointmentController {
       'Cannot modify COMPLETED or REJECTED appointments.',
   })
   @ApiParam({ name: 'id', description: 'The appointment MongoDB ObjectId.' })
-  @ApiResponse({ status: 200, description: 'Appointment updated successfully.' })
-  @ApiResponse({ status: 400, description: 'Invalid update or terminal appointment state.' })
-  @ApiResponse({ status: 401, description: 'Missing or invalid Authorization token.' })
-  @ApiResponse({ status: 403, description: 'Caller does not own this appointment.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Appointment updated successfully.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid update or terminal appointment state.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid Authorization token.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Caller does not own this appointment.',
+  })
   @ApiResponse({ status: 404, description: 'Appointment not found.' })
-  @ApiResponse({ status: 409, description: 'Slot conflict for new appointment time.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Slot conflict for new appointment time.',
+  })
   async updateAppointment(
     @Param('id') id: string,
     @Body() dto: UpdateAppointmentDto,
-    @Req() req: AuthenticatedRequest,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-role') role: string,
   ) {
-    return this.appointmentService.updateAppointment(
+    if (!userId || !role) {
+      throw new BadRequestException('Missing x-user-id or x-user-role headers');
+    }
+    return this.updateAppointmentUseCase.execute(
       id,
       dto,
-      req.user.userId,
-      req.user.role,
+      userId,
+      role as UserRole,
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // POST /appointments/webhook/payment — System Webhook
+  // -------------------------------------------------------------------------
+
+  @Post('webhook/payment')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Internal System Webhook - Process Payment Result',
+    description: 'Internal endpoint for Payment Service to report checkout completion.',
+  })
+  async processPaymentWebhook(@Body() dto: PaymentWebhookDto) {
+    return this.processPaymentWebhookUseCase.execute(dto);
   }
 }

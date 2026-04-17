@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AvailabilityService } from '../../application/services/availability.service';
 import { ValidateSlotDto } from '../../application/dtos/validate-slot.dto';
 import { ServiceOrGatewayAuthGuard } from '../../../common/guards/service-or-gateway-auth.guard';
@@ -28,6 +36,9 @@ export class AvailabilityIntegrationController {
 
   @Post('validate-slot')
   validateSlot(@Body() dto: ValidateSlotDto) {
-    return this.availabilityService.validateSlot(dto.doctorUserId, dto.slotStart);
+    return this.availabilityService.validateSlot(
+      dto.doctorUserId,
+      dto.slotStart,
+    );
   }
 }
